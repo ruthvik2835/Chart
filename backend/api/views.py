@@ -48,54 +48,6 @@ def get_item(request, id):
     
 
 
-
-
-    
-@api_view(['GET'])
-def get_item_by_symbol(request):
-    start_time = time.time()
-    symbol = request.query_params.get('symbol')
-    date_str = request.query_params.get('date')
-    time_gap_str = request.query_params.get('time_gap')  # in seconds
-    N = int(request.query_params.get('N'))
-
-    print(symbol,date_str,time_gap_str)
-
-    if not symbol or not date_str or not time_gap_str:
-        return Response({'error': 'Parameters "symbol", "date", and "time_gap" must be provided'}, status=status.HTTP_400_BAD_REQUEST)
-
-    target_date = parse_datetime(date_str)
-    try:
-        time_gap = int(time_gap_str)
-    except ValueError:
-        return Response({'error': '"time_gap" must be an integer representing seconds'}, status=status.HTTP_400_BAD_REQUEST)
-
-    if not target_date:
-        return Response({'error': 'Invalid date format. Use ISO format (e.g., 2024-01-01T12:00:00Z)'}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Ensure timezone-aware datetime
-    if target_date.tzinfo is None:
-        target_date = make_aware(target_date)
-
-
-    try:
-        times = [target_date + timedelta(seconds=i * time_gap) for i in range(N)]
-        items = Item.objects.filter(symbol=symbol, time__in=times)
-
-        serializer = ItemSerializer(items, many=True)
-        duration = time.time() - start_time
-        print("No of items: ",len(items)," Time taken:", duration)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    # http://127.0.0.1:8000/api/items/get/?symbol=RD&date=2005-05-17T09:00:48Z&time_gap=60&N=1000
-    # http://127.0.0.1:8000/api/items/get/?symbol=RUTH&date=2025-05-17T09:00:00Z&time_gap=60&N=1000
-
-# Modify the above view. Start date enddate number of points(N) and time gap are given as input. Select a start date thats a multiple of time gap.For example if time gap is 60 seconds take the nearst minute as start date and same applies to the end date.Then you have to provide me N equidistant points between these two dates. Time gap is in milliseconds
-
-
-
 def round_to_nearest_multiple(timestamp_float, multiple_seconds):
     """
     Rounds a Unix timestamp (float) to the nearest multiple of 'multiple_seconds'.
@@ -117,8 +69,6 @@ def get_items_equidistant(request):
     """
     start_time_measurement = time.time()
 
-
-    # Get parameters from query string
     symbol = request.query_params.get('symbol')
     start_date_str = request.query_params.get('start_date')
     end_date_str = request.query_params.get('end_date')
@@ -317,9 +267,7 @@ def get_items_equidistant(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     except Exception as e:
-        # Log the exception e for server-side debugging
-        # import logging
-        # logging.exception(f"Error in get_items_equidistant for symbol {symbol}")
+
         return Response(
             {'error': 'An unexpected error occurred during data retrieval.', 'details': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
