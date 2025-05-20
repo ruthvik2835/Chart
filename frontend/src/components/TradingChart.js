@@ -2,29 +2,28 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Highcharts from 'highcharts/highstock';
 import HighchartsReact from 'highcharts-react-official';
 
+const SYMBOLS = ['AAPL', 'NFLX', 'GOOG', 'AMZN', 'TSLA'];
+const DEFAULT_VISIBLE_COLUMNS = {
+  c1: true, c2: true, c3: true, c4: true, c5: true, c6: true
+};
+const DEFAULT_TIMEFRAME = '1min';
+const DEFAULT_YSCALE = 'linear';
+
+
 
 const oneDay = 24 * 3600 * 1000;
 function parseTimeGapToSeconds(timeStr) {
-  // Match a number (integer or float) followed by a unit
   const match = /^([\d.]+)\s*(ms|s|min|h|d)?$/.exec(timeStr.trim());
   if (!match) return NaN;
-
   const value = parseFloat(match[1]);
-  const unit = match[2] || 's'; // Default to seconds if no unit
-
+  const unit = match[2] || 's';
   switch (unit) {
-    case 'ms':
-      return value / 1000;
-    case 's':
-      return value;
-    case 'min':
-      return value * 60;
-    case 'h':
-      return value * 3600;
-    case 'd':
-      return value * oneDay;
-    default:
-      return value;
+    case 'ms': return value / 1000;
+    case 's': return value;
+    case 'min': return value * 60;
+    case 'h': return value * 3600;
+    case 'd': return value * oneDay;
+    default: return value;
   }
 }
 
@@ -55,16 +54,24 @@ const generateDaySeparators = (min, max) => {
 
 const timeframeMinMs = { '1s': 1000, '1min': 60000, '5min': 300000, '1h': 3600000, '1d': oneDay };
 const COLORS = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#17a2b8'];
+const COLUMN_KEYS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'];
 
 const TradingChart = () => {
   const chartRef = useRef(null);
+  const [symbol, setSymbol] = useState('AAPL');
   const chartContainerRef = useRef(null);
   const [seriesData, setSeriesData] = useState([]);
+  const [rawSeries, setRawSeries] = useState([]); // Store raw data for toggling visibility
   const [timeframe, setTimeframe] = useState('1min');
   const [yScale, setYScale] = useState('linear');
   const [visibleRange, setVisibleRange] = useState({ min: null, max: null });
   const [loadedRange, setLoadedRange] = useState({ min: null, max: null });
   const [isLoading, setIsLoading] = useState(false);
+
+  // New: Track which columns are visible
+  const [visibleColumns, setVisibleColumns] = useState({
+    c1: true, c2: true, c3: true, c4: true, c5: true, c6: true
+  });
 
   // Fetch and format all 6 series (c1-c6)
   const fetchData = useCallback(async (min, max) => {
@@ -72,8 +79,9 @@ const TradingChart = () => {
     try {
       const startISO = new Date(min).toISOString();
       const endISO = new Date(max).toISOString();
+      console.log(startISO,endISO);
       const resp = await fetch(
-        `/api/items/e/?symbol=AMZN&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1000`
+        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=500`
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -89,21 +97,35 @@ const TradingChart = () => {
         c5.push([t, Number(item.c5)]);
         c6.push([t, Number(item.c6)]);
       });
-      setSeriesData([
+      // Store raw series for toggling
+      const raw = [
         { name: 'c1', data: c1, type: 'line', color: COLORS[0] },
         { name: 'c2', data: c2, type: 'line', color: COLORS[1] },
         { name: 'c3', data: c3, type: 'line', color: COLORS[2] },
         { name: 'c4', data: c4, type: 'line', color: COLORS[3] },
         { name: 'c5', data: c5, type: 'line', color: COLORS[4] },
         { name: 'c6', data: c6, type: 'line', color: COLORS[5] }
-      ]);
+      ];
+      setRawSeries(raw);
+      // Set seriesData with visibility
+      setSeriesData(
+        raw.map((s, i) => ({ ...s, visible: visibleColumns[s.name] }))
+      );
       setLoadedRange({ min, max });
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [timeframe]);
+  // Add visibleColumns as dependency so toggling works after fetch
+  }, [timeframe, visibleColumns]);
+
+  // Update seriesData when visibleColumns or rawSeries changes
+  useEffect(() => {
+    setSeriesData(
+      rawSeries.map(s => ({ ...s, visible: visibleColumns[s.name] }))
+    );
+  }, [visibleColumns, rawSeries]);
 
   const handleAfterSetExtremes = e => {
     const { min, max, trigger } = e;
@@ -112,7 +134,6 @@ const TradingChart = () => {
     const span = max - min;
     const nowspan = loadedRange.max - loadedRange.min;
     if (span <= nowspan * 0.5) {
-      // Align to timeframe boundary
       const unit = timeframeMinMs[timeframe];
       const alignedMin = Math.floor(min / unit) * unit;
       const alignedMax = Math.ceil(max / unit) * unit;
@@ -131,54 +152,66 @@ const TradingChart = () => {
     }
   };
 
-function instantZoomOut(chart, factor = 2) {
-  if (!chart || !chart.xAxis || !chart.xAxis[0]) return;
-  const axis = chart.xAxis[0];
-  const min0 = axis.min;
-  const max0 = axis.max;
-  const center = (min0 + max0) / 2;
-  const range0 = max0 - min0;
-  const range1 = range0 * factor;
-  const min1 = center - range1 / 2;
-  const max1 = center + range1 / 2;
-  axis.setExtremes(min1, max1, true, false, { trigger: 'zoom' });
-}
+  function smoothZoomOut(chart, factor = 2, steps = 10, duration = 400) {
+    if (!chart || !chart.xAxis || !chart.xAxis[0]) return;
+    const axis = chart.xAxis[0];
+    const min0 = axis.min;
+    const max0 = axis.max;
+    const center = (min0 + max0) / 2;
+    const range0 = max0 - min0;
+    const range1 = range0 * factor;
+    const min1 = center - range1 / 2;
+    const max1 = center + range1 / 2;
 
+    let step = 0;
+    const minStep = (min1 - min0) / steps;
+    const maxStep = (max1 - max0) / steps;
 
-const handleZoomOut = () => {
-  const chart = chartRef.current?.chart;
-  instantZoomOut(chart, 2, 20, 400); // 2x zoom out, 20 steps, 400ms total
-};
-
-useEffect(() => {
-  const container = chartContainerRef.current;
-  if (!container) return;
-  const onWheel = (e) => {
-    if (e.ctrlKey || e.metaKey) return; // Let browser zoom
-    if (e.deltaY > 0) {
-      // Scroll down: zoom out
-      handleZoomOut();
-      e.preventDefault();
+    function animateStep() {
+      step++;
+      const newMin = min0 + minStep * step;
+      const newMax = max0 + maxStep * step;
+      axis.setExtremes(newMin, newMax, true, false, { trigger: 'zoom' });
+      if (step < steps) {
+        setTimeout(animateStep, duration / steps);
+      }
     }
-  };
-  container.addEventListener('wheel', onWheel, { passive: false });
-  return () => container.removeEventListener('wheel', onWheel);
-}, [handleZoomOut]);
+    animateStep();
+  }
 
-  // const handleZoomOut = () => {
-  //   const chart = chartRef.current?.chart;
-  //   if (chart && loadedRange.min != null && loadedRange.max != null) {
-  //     const range = loadedRange.max - loadedRange.min;
-  //     const extra = range * 0.5;
-  //     chart.xAxis[0].setExtremes(
-  //       loadedRange.min - extra,
-  //       loadedRange.max + extra,
-  //       true,
-  //       false,
-  //       { trigger: 'zoom' }
-  //     );
-  //   }
-  // };
+  function instantZoomOut(chart, factor = 2) {
+    if (!chart || !chart.xAxis || !chart.xAxis[0]) return;
+    const axis = chart.xAxis[0];
+    const extremes = axis.getExtremes();
+    const min0 = extremes.min;
+    const max0 = extremes.max;
+    if (min0 == null || max0 == null) return;
+    const center = (min0 + max0) / 2;
+    const range0 = max0 - min0;
+    const range1 = range0 * factor;
+    const min1 = center - range1 / 2;
+    const max1 = center + range1 / 2;
+    axis.setExtremes(min1, max1, true, false, { trigger: 'zoom' });
+  }
+
+  const handleZoomOut = () => {
+    const chart = chartRef.current?.chart;
+    instantZoomOut(chart, 2);
+  };
+
+  useEffect(() => {
+    const container = chartContainerRef.current;
+    if (!container) return;
+    const onWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) return;
+      if (e.deltaY > 0) {
+        handleZoomOut();
+        e.preventDefault();
+      }
+    };
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => container.removeEventListener('wheel', onWheel);
+  }, [handleZoomOut]);
 
   const toggleFullScreen = () => {
     const el = chartContainerRef.current;
@@ -187,16 +220,30 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    // Use a reasonable default range: last 1 hour
+    console.log("Initial fetch!")
     const now = Date.now();
-    const initialMin = now - 60 * 60 * 1000 *10000;
+    const initialMin = now - 60 * 60 * 1000 * 10000;
     const initialMax = now;
     setVisibleRange({ min: initialMin, max: initialMax });
     fetchData(initialMin, initialMax);
-  }, [fetchData]);
+  }, []);
+  useEffect(() => {
+    console.log("Symbol Change!")
+    setLoadedRange({ min: null, max: null });
+    setSeriesData([]);
+    setRawSeries([]);
+    setTimeframe(DEFAULT_TIMEFRAME);
+    setYScale(DEFAULT_YSCALE);
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
+    const now = Date.now();
+    const initialMin = now - 60 * 60 * 1000 * 10000;
+    const initialMax = now;
+    console.log(initialMin,initialMax)
+    setVisibleRange({ min: initialMin, max: initialMax });
+    fetchData(initialMin, initialMax);
+  }, [symbol]);
 
   useEffect(() => {
-    console.log("here");
     const handleKeyDown = (e) => {
       const chart = chartRef.current?.chart;
       if (!chart) return;
@@ -229,7 +276,7 @@ useEffect(() => {
   }, []);
 
   const chartOptions = {
-    chart: { zoomType: 'x', panning: true, panKey: 'shift' },
+    chart: { zoomType: 'x', panning: true, panKey: 'shift', animation: false },
     title: { text: `Trading Chart (${timeframe})` },
     xAxis: {
       type: 'datetime',
@@ -280,6 +327,28 @@ useEffect(() => {
           <option value="linear">Y-Scale: Linear</option>
           <option value="logarithmic">Y-Scale: Logarithmic</option>
         </select>
+        {/* Column visibility checkboxes */}
+        <div style={{ marginLeft: 16, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {COLUMN_KEYS.map((col, idx) => (
+            <label key={col} style={{ marginRight: 8, display: 'flex', alignItems: 'center', fontWeight: 500 }}>
+              <input
+                type="checkbox"
+                checked={visibleColumns[col]}
+                onChange={() =>
+                  setVisibleColumns(v => ({ ...v, [col]: !v[col] }))
+                }
+                style={{ marginRight: 4 }}
+              />
+              <span style={{ color: COLORS[idx] }}>{col}</span>
+            </label>
+          ))}
+        </div>
+        <select value={symbol} onChange={e => setSymbol(e.target.value)}>
+            {SYMBOLS.map(sym => (
+              <option value={sym} key={sym}>{sym}</option>
+            ))}
+        </select>
+
         <div style={{ flexGrow: 1 }} />
         <button onClick={handleZoomOut} style={{
           padding: '6px 12px',
