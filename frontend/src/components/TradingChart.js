@@ -52,13 +52,13 @@ const generateDaySeparators = (min, max) => {
   return lines;
 };
 
-const timeframeMinMs = { '1s': 1000, '1min': 60000, '5min': 300000, '1h': 3600000, '1d': oneDay };
+const timeframeMinMs = { '1ms':1 , '10ms':10, '100ms':100,'1s': 1000, '1min': 60000, '5min': 300000, '1h': 3600000, '1d': oneDay };
 const COLORS = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#17a2b8'];
 const COLUMN_KEYS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'];
 
 const TradingChart = () => {
   const chartRef = useRef(null);
-  const [symbol, setSymbol] = useState('AAPL');
+  const [symbol, setSymbol] = useState('AMZN');
   const chartContainerRef = useRef(null);
   const [seriesData, setSeriesData] = useState([]);
   const [rawSeries, setRawSeries] = useState([]); // Store raw data for toggling visibility
@@ -77,11 +77,12 @@ const TradingChart = () => {
   const fetchData = useCallback(async (min, max) => {
     setIsLoading(true);
     try {
+      const starttime=performance.now();
       const startISO = new Date(min).toISOString();
       const endISO = new Date(max).toISOString();
       console.log(startISO,endISO);
       const resp = await fetch(
-        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=500`
+        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1000`
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -97,6 +98,7 @@ const TradingChart = () => {
         c5.push([t, Number(item.c5)]);
         c6.push([t, Number(item.c6)]);
       });
+      console.log(c1.length)
       // Store raw series for toggling
       const raw = [
         { name: 'c1', data: c1, type: 'line', color: COLORS[0] },
@@ -107,25 +109,27 @@ const TradingChart = () => {
         { name: 'c6', data: c6, type: 'line', color: COLORS[5] }
       ];
       setRawSeries(raw);
+      console.log(raw.length);
       // Set seriesData with visibility
       setSeriesData(
-        raw.map((s, i) => ({ ...s, visible: visibleColumns[s.name] }))
+        raw.map((s, i) => ({ ...s, visible: visibleColumns[s.name],boostThreshold:1 }))
       );
       setLoadedRange({ min, max });
+      console.log("time of fetch: " ,performance.now()-starttime)
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
       setIsLoading(false);
     }
   // Add visibleColumns as dependency so toggling works after fetch
-  }, [timeframe, visibleColumns]);
+  }, [timeframe, symbol, visibleColumns]);
 
   // Update seriesData when visibleColumns or rawSeries changes
   useEffect(() => {
     setSeriesData(
-      rawSeries.map(s => ({ ...s, visible: visibleColumns[s.name] }))
+      rawSeries.map(s => ({ ...s, visible: visibleColumns[s.name],boostThreshold:1 }))
     );
-  }, [visibleColumns, rawSeries]);
+  }, [visibleColumns,symbol, rawSeries]);
 
   const handleAfterSetExtremes = e => {
     const { min, max, trigger } = e;
@@ -140,8 +144,13 @@ const TradingChart = () => {
       fetchData(alignedMin, alignedMax);
       return;
     }
-    if (loadedRange.min != null && loadedRange.max != null) {
+    if(trigger=='pan'){
+      fetchData(min,max);
+      return;
+    }
+    if (loadedRange.min != null && loadedRange.max != null)  {
       if (min >= loadedRange.min && max <= loadedRange.max) {
+        console.log("Within range: skipping fetch");
         return;
       }
       const newMin = Math.min(min, loadedRange.min);
@@ -248,11 +257,11 @@ const TradingChart = () => {
       const chart = chartRef.current?.chart;
       if (!chart) return;
       const visibleSpan = chart.xAxis[0].max - chart.xAxis[0].min;
-      const panAmount = visibleSpan * 0.05;
+      const panAmount = visibleSpan * 0.1;
       if (e.key === 'ArrowLeft') {
         const newMin = Math.max(chart.xAxis[0].min - panAmount, -8640000000000000);
         const newMax = Math.max(chart.xAxis[0].max - panAmount, newMin + 1000);
-        chart.xAxis[0].setExtremes(
+         chart.xAxis[0].setExtremes(
           newMin,
           newMax,
           true,
@@ -268,7 +277,7 @@ const TradingChart = () => {
           true,
           false,
           { trigger: 'pan' }
-        );
+        );      
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -288,7 +297,14 @@ const TradingChart = () => {
     },
     yAxis: { type: yScale, title: { text: 'Price' } },
     tooltip: { shared: true, xDateFormat: '%Y-%m-%d %H:%M:%S' },
+    dataGrouping:{enabled:false},
+    // console.log(seriesData);
     series: seriesData,
+    boost: {
+        useGPUTranslations: true,
+        // Chart-level boost when there are more than 5 series in the chart
+        seriesThreshold: 1
+    },
     plotOptions: {
       line: { marker: { enabled: false } }
     },
@@ -307,13 +323,15 @@ const TradingChart = () => {
           ]
         }
       }
-    }
+    },
+    
+    
   };
 
   return (
     <div ref={chartContainerRef} style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: '#f8f9fa' }}>
-        {['1s', '1min', '5min', '1h', '1d'].map(tf => (
+        {['1ms','10ms','100ms','1s', '1min', '5min', '1h', '1d'].map(tf => (
           <button key={tf} onClick={() => setTimeframe(tf)} style={{
             background: timeframe === tf ? '#007bff' : '#e2e6ea',
             color: timeframe === tf ? '#fff' : '#000',

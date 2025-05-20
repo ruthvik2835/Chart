@@ -215,7 +215,7 @@ def get_items_equidistant(request):
 
             interval_seconds = math.floor(num_intervals / (N - 1)) # Can be float
 
-            print("interval_seconds",interval_seconds)
+            print("difference: ",interval_seconds * time_gap_seconds)
 
 
 
@@ -267,7 +267,7 @@ def get_items_equidistant(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     except Exception as e:
-
+        print(str(e))
         return Response(
             {'error': 'An unexpected error occurred during data retrieval.', 'details': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
