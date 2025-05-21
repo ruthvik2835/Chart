@@ -78,11 +78,12 @@ const TradingChart = () => {
     setIsLoading(true);
     try {
       const starttime=performance.now();
-      const startISO = new Date(min).toISOString();
-      const endISO = new Date(max).toISOString();
+      const d = max-min;
+      const startISO = new Date(min-d).toISOString();
+      const endISO = new Date(max+d).toISOString();
       console.log(startISO,endISO);
       const resp = await fetch(
-        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1000`
+        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=500`
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -114,7 +115,8 @@ const TradingChart = () => {
       setSeriesData(
         raw.map((s, i) => ({ ...s, visible: visibleColumns[s.name],boostThreshold:1 }))
       );
-      setLoadedRange({ min, max });
+      console.log(min,max);
+      setLoadedRange({ min: min-d, max: max+d });
       console.log("time of fetch: " ,performance.now()-starttime)
     } catch (err) {
       console.error('Fetch error:', err);
@@ -135,19 +137,34 @@ const TradingChart = () => {
     const { min, max, trigger } = e;
     if (isLoading || trigger === 'init') return;
     setVisibleRange({ min, max });
+    // console.log(trigger);
     const span = max - min;
     const nowspan = loadedRange.max - loadedRange.min;
-    if (span <= nowspan * 0.5) {
+    if (span <= nowspan * 0.3) {
+      console.log(trigger);
       const unit = timeframeMinMs[timeframe];
       const alignedMin = Math.floor(min / unit) * unit;
       const alignedMax = Math.ceil(max / unit) * unit;
       fetchData(alignedMin, alignedMax);
       return;
     }
-    if(trigger=='pan'){
-      fetchData(min,max);
+    console.log("hello",trigger);
+    if(trigger=="pan"){
+      console.log("arrow cause pan trigger");
+      const diff= Math.floor((loadedRange.max-loadedRange.min)/5);
+      if((max>=loadedRange.max-diff)|| (min<=loadedRange.min+diff)){
+       const unit = timeframeMinMs[timeframe];
+        const alignedMin = Math.floor(min / unit) * unit;
+        const alignedMax = Math.ceil(max / unit) * unit;
+        fetchData(alignedMin, alignedMax);
+      }      
       return;
     }
+    if(trigger==undefined){
+      console.log("handling undefined trigger");
+      return;
+    }
+    console.log("other trigger");
     if (loadedRange.min != null && loadedRange.max != null)  {
       if (min >= loadedRange.min && max <= loadedRange.max) {
         console.log("Within range: skipping fetch");
@@ -155,6 +172,7 @@ const TradingChart = () => {
       }
       const newMin = Math.min(min, loadedRange.min);
       const newMax = Math.max(max, loadedRange.max);
+      const unit = timeframeMinMs[timeframe];
       fetchData(newMin, newMax);
     } else {
       fetchData(min, max);
@@ -256,8 +274,10 @@ const TradingChart = () => {
     const handleKeyDown = (e) => {
       const chart = chartRef.current?.chart;
       if (!chart) return;
+      console.log("loaded range", loadedRange);
+      console.log("arrowpressed");
       const visibleSpan = chart.xAxis[0].max - chart.xAxis[0].min;
-      const panAmount = visibleSpan * 0.1;
+      const panAmount = visibleSpan * 0.05;
       if (e.key === 'ArrowLeft') {
         const newMin = Math.max(chart.xAxis[0].min - panAmount, -8640000000000000);
         const newMax = Math.max(chart.xAxis[0].max - panAmount, newMin + 1000);
