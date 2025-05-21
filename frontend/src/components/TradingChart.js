@@ -83,7 +83,7 @@ const TradingChart = () => {
       const endISO = new Date(max+d).toISOString();
       console.log(startISO,endISO);
       const resp = await fetch(
-        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1500`
+        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=500`
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -140,7 +140,7 @@ const TradingChart = () => {
     // console.log(trigger);
     const span = max - min;
     const nowspan = loadedRange.max - loadedRange.min;
-    if (span <= nowspan * 0.3) {
+    if (trigger!='zoomout'&&span <= nowspan * 0.3) {
       console.log(trigger);
       const unit = timeframeMinMs[timeframe];
       const alignedMin = Math.floor(min / unit) * unit;
@@ -163,19 +163,23 @@ const TradingChart = () => {
     if(trigger=='zoomout'){
       console.log("wheel cause zoomout");
       const diff= Math.floor((loadedRange.max-loadedRange.min)/5);
+      console.log(min,max, diff, loadedRange.min, loadedRange.max);
       if((max>=loadedRange.max-diff)|| (min<=loadedRange.min+diff)){
+        console.log("fetching");
        const unit = timeframeMinMs[timeframe];
         const alignedMin = Math.floor(min / unit) * unit;
         const alignedMax = Math.ceil(max / unit) * unit;
         fetchData(alignedMin, alignedMax);
+        return;
       }
+      console.log("not fetching");
       return;
     }
     if(trigger==undefined){
-      console.log("handling undefined trigger");
+      console.log("handling undefined trigger");    
       return;
     }
-    console.log("other trigger");
+    console.log(trigger);
     if (loadedRange.min != null && loadedRange.max != null)  {
       if (min >= loadedRange.min && max <= loadedRange.max) {
         console.log("Within range: skipping fetch");
@@ -198,13 +202,13 @@ const TradingChart = () => {
     const center = Math.floor((min0 + max0) / 2);
     const range0 = max0 - min0;
     const range1 = range0 * factor;
-    const newMin = center - Math.floor(range1 / 2);
-    const newMax = center + Math.floor(range1 / 2);
+    const newMin = center - Math.ceil(range1 / 2);
+    const newMax = center + Math.ceil(range1 / 2);
    chart.xAxis[0].setExtremes(
       newMin,
       newMax,
       true,
-      false,
+      true,
       { trigger: 'zoomout' }
     );
   }
