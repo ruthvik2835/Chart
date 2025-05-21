@@ -83,7 +83,7 @@ const TradingChart = () => {
       const endISO = new Date(max+d).toISOString();
       console.log(startISO,endISO);
       const resp = await fetch(
-        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=500`
+        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1500`
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -99,7 +99,7 @@ const TradingChart = () => {
         c5.push([t, Number(item.c5)]);
         c6.push([t, Number(item.c6)]);
       });
-      console.log(c1.length)
+      // console.log(ArrayBuffer.byteLength(c1));
       // Store raw series for toggling
       const raw = [
         { name: 'c1', data: c1, type: 'line', color: COLORS[0] },
@@ -110,12 +110,12 @@ const TradingChart = () => {
         { name: 'c6', data: c6, type: 'line', color: COLORS[5] }
       ];
       setRawSeries(raw);
-      console.log(raw.length);
+      // console.log(raw.length);
       // Set seriesData with visibility
       setSeriesData(
         raw.map((s, i) => ({ ...s, visible: visibleColumns[s.name],boostThreshold:1 }))
       );
-      console.log(min,max);
+      // console.log(min,max);
       setLoadedRange({ min: min-d, max: max+d });
       console.log("time of fetch: " ,performance.now()-starttime)
     } catch (err) {
@@ -136,7 +136,7 @@ const TradingChart = () => {
   const handleAfterSetExtremes = e => {
     const { min, max, trigger } = e;
     if (isLoading || trigger === 'init') return;
-    setVisibleRange({ min, max });
+    setVisibleRange({ min :min, max: max });
     // console.log(trigger);
     const span = max - min;
     const nowspan = loadedRange.max - loadedRange.min;
@@ -160,6 +160,17 @@ const TradingChart = () => {
       }      
       return;
     }
+    if(trigger=='zoomout'){
+      console.log("wheel cause zoomout");
+      const diff= Math.floor((loadedRange.max-loadedRange.min)/5);
+      if((max>=loadedRange.max-diff)|| (min<=loadedRange.min+diff)){
+       const unit = timeframeMinMs[timeframe];
+        const alignedMin = Math.floor(min / unit) * unit;
+        const alignedMax = Math.ceil(max / unit) * unit;
+        fetchData(alignedMin, alignedMax);
+      }
+      return;
+    }
     if(trigger==undefined){
       console.log("handling undefined trigger");
       return;
@@ -179,51 +190,28 @@ const TradingChart = () => {
     }
   };
 
-  function smoothZoomOut(chart, factor = 2, steps = 10, duration = 400) {
+  function instantZoomOut(chart, factor = 1.2) {
     if (!chart || !chart.xAxis || !chart.xAxis[0]) return;
-    const axis = chart.xAxis[0];
-    const min0 = axis.min;
-    const max0 = axis.max;
-    const center = (min0 + max0) / 2;
-    const range0 = max0 - min0;
-    const range1 = range0 * factor;
-    const min1 = center - range1 / 2;
-    const max1 = center + range1 / 2;
-
-    let step = 0;
-    const minStep = (min1 - min0) / steps;
-    const maxStep = (max1 - max0) / steps;
-
-    function animateStep() {
-      step++;
-      const newMin = min0 + minStep * step;
-      const newMax = max0 + maxStep * step;
-      axis.setExtremes(newMin, newMax, true, false, { trigger: 'zoom' });
-      if (step < steps) {
-        setTimeout(animateStep, duration / steps);
-      }
-    }
-    animateStep();
-  }
-
-  function instantZoomOut(chart, factor = 2) {
-    if (!chart || !chart.xAxis || !chart.xAxis[0]) return;
-    const axis = chart.xAxis[0];
-    const extremes = axis.getExtremes();
-    const min0 = extremes.min;
-    const max0 = extremes.max;
+    const min0 = chart.xAxis[0].min;
+    const max0 = chart.xAxis[0].max;
     if (min0 == null || max0 == null) return;
-    const center = (min0 + max0) / 2;
+    const center = Math.floor((min0 + max0) / 2);
     const range0 = max0 - min0;
     const range1 = range0 * factor;
-    const min1 = center - range1 / 2;
-    const max1 = center + range1 / 2;
-    axis.setExtremes(min1, max1, true, false, { trigger: 'zoom' });
+    const newMin = center - Math.floor(range1 / 2);
+    const newMax = center + Math.floor(range1 / 2);
+   chart.xAxis[0].setExtremes(
+      newMin,
+      newMax,
+      true,
+      false,
+      { trigger: 'zoomout' }
+    );
   }
 
   const handleZoomOut = () => {
     const chart = chartRef.current?.chart;
-    instantZoomOut(chart, 2);
+    instantZoomOut(chart);
   };
 
   useEffect(() => {
