@@ -21,6 +21,68 @@ import io
 from django.utils.timezone import make_aware, is_aware
 from django.db.models.functions import TruncMinute, TruncHour, TruncMonth
 import math
+from datetime import timedelta
+
+def compute_frame_and_timestamps_ms_aligned(start_dt, end_dt, N):
+    """
+    Compute the best frame (in milliseconds) and a list of ISO‐timestamps,
+    such that:
+      • frame_ms is chosen from allowed intervals to be >= (end-start)/N
+      • every timestamp is an exact multiple of frame_ms since Unix epoch
+      • timestamps run from the first aligned point >= start_dt up to end_dt
+
+    Returns:
+      frame_ms: int          # chosen interval in milliseconds
+      timestamps: List[str]  # ISO timestamps aligned to multiples of frame_ms
+    """
+    # 1) Compute total span in ms
+    total_ms = int((end_dt - start_dt).total_seconds() * 1000)
+    if total_ms <= 0 or N <= 0:
+        return None, []
+
+    # 2) Raw ideal step in ms, rounding up
+    raw_step_ms = (total_ms + N - 1) // N
+
+    # 3) Allowed frames (all in ms)
+    allowed_ms = [
+        1,    # 1 ms
+        5,    # 5 ms
+        10,   # 10 ms
+        50,   # 50 ms
+        100,  # 100 ms
+        500,  # 500 ms
+        1000,    # 1 s
+        5000,    # 5 s
+        10000,   # 10 s
+        60000,   # 1 min
+        300000,  # 5 min
+        600000,  # 10 min
+    ]
+
+    # 4) Pick the smallest allowed >= raw_step_ms, else the largest
+    frame_ms = next((f for f in allowed_ms if f >= raw_step_ms), allowed_ms[-1])
+
+    # 5) Align the first timestamp:
+    #    find start_ms since epoch, then round *up* to nearest multiple of frame_ms
+    start_ms = int(start_dt.timestamp() * 1000)
+    mod = start_ms % frame_ms
+    if mod == 0:
+        aligned_start_ms = start_ms
+    else:
+        aligned_start_ms = start_ms + (frame_ms - mod)
+
+    # 6) Build the timestamp list
+    timestamps = []
+    step = timedelta(milliseconds=frame_ms)
+    cur_dt = start_dt + timedelta(milliseconds=(aligned_start_ms - start_ms))
+    # note: cur_dt is the aligned first timestamp
+
+    while cur_dt <= end_dt:
+        timestamps.append(cur_dt.isoformat())
+        cur_dt += step
+
+    return frame_ms, timestamps
+
 
 class ItemListView(ListAPIView):
     queryset = Item.objects.all()
@@ -84,6 +146,7 @@ def get_items_equidistant(request):
         'time_gap': time_gap_str,
         'N': N_str
     }
+    
     missing_params = [name for name, val in required_params.items() if val is None]
     if missing_params:
         return Response(
@@ -132,6 +195,7 @@ def get_items_equidistant(request):
         )
     if not is_aware(end_date):
         end_date = make_aware(end_date)
+    
 
     # --- 6. Validate date order (original dates) ---
     if start_date >= end_date:
@@ -139,6 +203,7 @@ def get_items_equidistant(request):
             {'error': 'start_date must be strictly before end_date.'},
             status=status.HTTP_400_BAD_REQUEST
         )
+    print(compute_frame_and_timestamps_ms_aligned(start_date,end_date,N))
 
     # print("here 2")
     first_item = Item.objects.filter(symbol=symbol).order_by('time').first()

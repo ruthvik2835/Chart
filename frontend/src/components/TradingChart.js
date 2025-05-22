@@ -98,7 +98,7 @@ const TradingChart = () => {
 
       const promises = symbolsToFetch.map(currentSymbol =>
         fetch(
-          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1500`
+          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=5`
         ).then(async resp => {
           if (!resp.ok) {
             const errorBody = await resp.text();
@@ -499,7 +499,7 @@ const TradingChart = () => {
     // chartOptions.chart.events.load = function() { this.showLoading('Loading data...'); }; // Doesn't work well for dynamic loading
     // A better way is to use chart.showLoading() / chart.hideLoading() directly
     if (chartRef.current && chartRef.current.chart) {
-        chartRef.current.chart.showLoading('Updating data...');
+        // chartRef.current.chart.showLoading('Updating data...');
     }
   } else {
     if (chartRef.current && chartRef.current.chart) {
