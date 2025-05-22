@@ -20,7 +20,10 @@ import csv
 import io 
 from django.utils.timezone import make_aware, is_aware
 from django.db.models.functions import TruncMinute, TruncHour, TruncMonth
-import math
+import math,time
+# from django.middleware.gzip import GZipMiddleware
+# from django.utils.decorators import decorator_from_middleware
+# gzip_decorator = decorator_from_middleware(GZipMiddleware)
 
 class ItemListView(ListAPIView):
     queryset = Item.objects.all()
@@ -38,6 +41,7 @@ class EditItemView(UpdateAPIView):
 
 
 @api_view(['GET'])
+# @gzip_decorator
 def get_item(request, id):
     try:
         item = Item.objects.get(id=id)
@@ -61,6 +65,7 @@ def round_to_nearest_multiple(timestamp_float, multiple_seconds):
 
 
 @api_view(['GET'])
+# @gzip_decorator
 def get_items_equidistant(request):
     """
     Fetches N equidistant items for a given symbol between a start and end date.

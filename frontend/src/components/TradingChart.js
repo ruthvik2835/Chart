@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Highcharts from 'highcharts/highstock';
 import HighchartsReact from 'highcharts-react-official';
+import 'highcharts/modules/boost';
 
 const SYMBOLS = ['AAPL', 'NFLX', 'GOOG', 'AMZN', 'TSLA'];
 const DEFAULT_VISIBLE_COLUMNS = {
   c1: true, c2: true, c3: true, c4: true, c5: true, c6: true
 };
-const DEFAULT_TIMEFRAME = '1min';
+const DEFAULT_TIMEFRAME = '10ms';
 const DEFAULT_YSCALE = 'linear';
 
 
@@ -18,6 +19,7 @@ function parseTimeGapToSeconds(timeStr) {
   const value = parseFloat(match[1]);
   const unit = match[2] || 's';
   switch (unit) {
+
     case 'ms': return value / 1000;
     case 's': return value;
     case 'min': return value * 60;
@@ -62,7 +64,7 @@ const TradingChart = () => {
   const chartContainerRef = useRef(null);
   const [seriesData, setSeriesData] = useState([]);
   const [rawSeries, setRawSeries] = useState([]); // Store raw data for toggling visibility
-  const [timeframe, setTimeframe] = useState('1min');
+  const [timeframe, setTimeframe] = useState('10ms');
   const [yScale, setYScale] = useState('linear');
   const [visibleRange, setVisibleRange] = useState({ min: null, max: null });
   const [loadedRange, setLoadedRange] = useState({ min: null, max: null });
@@ -83,7 +85,7 @@ const TradingChart = () => {
       const endISO = new Date(max+d).toISOString();
       console.log(startISO,endISO);
       const resp = await fetch(
-        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=500`
+        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1000`
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -102,18 +104,18 @@ const TradingChart = () => {
       // console.log(ArrayBuffer.byteLength(c1));
       // Store raw series for toggling
       const raw = [
-        { name: 'c1', data: c1, type: 'line', color: COLORS[0] },
-        { name: 'c2', data: c2, type: 'line', color: COLORS[1] },
-        { name: 'c3', data: c3, type: 'line', color: COLORS[2] },
-        { name: 'c4', data: c4, type: 'line', color: COLORS[3] },
-        { name: 'c5', data: c5, type: 'line', color: COLORS[4] },
-        { name: 'c6', data: c6, type: 'line', color: COLORS[5] }
+        { name: 'c1', data: c1, type: 'line', color: COLORS[0],boostThreshold:0,dataGrouping:{enabled:false}},
+        { name: 'c2', data: c2, type: 'line', color: COLORS[1],boostThreshold:0,dataGrouping:{enabled:false} },
+        { name: 'c3', data: c3, type: 'line', color: COLORS[2],boostThreshold:0,dataGrouping:{enabled:false} },
+        { name: 'c4', data: c4, type: 'line', color: COLORS[3],boostThreshold:0,dataGrouping:{enabled:false} },
+        { name: 'c5', data: c5, type: 'line', color: COLORS[4],boostThreshold:0,dataGrouping:{enabled:false} },
+        { name: 'c6', data: c6, type: 'line', color: COLORS[5],boostThreshold:0,dataGrouping:{enabled:false} }
       ];
       setRawSeries(raw);
       // console.log(raw.length);
       // Set seriesData with visibility
       setSeriesData(
-        raw.map((s, i) => ({ ...s, visible: visibleColumns[s.name],boostThreshold:1 }))
+        raw.map((s, i) => ({ ...s, visible: visibleColumns[s.name],boostThreshold:0,dataGrouping:{enabled:false} }))
       );
       // console.log(min,max);
       setLoadedRange({ min: min-d, max: max+d });
@@ -129,7 +131,7 @@ const TradingChart = () => {
   // Update seriesData when visibleColumns or rawSeries changes
   useEffect(() => {
     setSeriesData(
-      rawSeries.map(s => ({ ...s, visible: visibleColumns[s.name],boostThreshold:1 }))
+      rawSeries.map(s => ({ ...s, visible: visibleColumns[s.name],boostThreshold:0,dataGrouping:{enabled:false} }))
     );
   }, [visibleColumns,symbol, rawSeries]);
 
@@ -140,7 +142,7 @@ const TradingChart = () => {
     // console.log(trigger);
     const span = max - min;
     const nowspan = loadedRange.max - loadedRange.min;
-    if (trigger!='zoomout'&&span <= nowspan * 0.3) {
+    if (trigger!=='zoomout'&&span <= nowspan * 0.3) {
       console.log(trigger);
       const unit = timeframeMinMs[timeframe];
       const alignedMin = Math.floor(min / unit) * unit;
@@ -149,7 +151,7 @@ const TradingChart = () => {
       return;
     }
     console.log("hello",trigger);
-    if(trigger=="pan"){
+    if(trigger==="pan"){
       console.log("arrow cause pan trigger");
       const diff= Math.floor((loadedRange.max-loadedRange.min)/5);
       if((max>=loadedRange.max-diff)|| (min<=loadedRange.min+diff)){
@@ -160,7 +162,7 @@ const TradingChart = () => {
       }      
       return;
     }
-    if(trigger=='zoomout'){
+    if(trigger==='zoomout'){
       console.log("wheel cause zoomout");
       const diff= Math.floor((loadedRange.max-loadedRange.min)/5);
       console.log(min,max, diff, loadedRange.min, loadedRange.max);
@@ -175,8 +177,19 @@ const TradingChart = () => {
       console.log("not fetching");
       return;
     }
-    if(trigger==undefined){
-      console.log("handling undefined trigger");    
+    if(trigger===undefined){
+      console.log(loadedRange.min,loadedRange.max,min,max);
+      console.log("handling undefined trigger");  
+      return;  
+      const diff= Math.floor((loadedRange.max-loadedRange.min)/5);
+       if((max>=loadedRange.max-diff)|| (min<=loadedRange.min+diff)){
+        console.log("fetching");
+       const unit = timeframeMinMs[timeframe];
+        const alignedMin = Math.floor(min / unit) * unit;
+        const alignedMax = Math.ceil(max / unit) * unit;
+        fetchData(alignedMin, alignedMax);
+        return;
+      }
       return;
     }
     console.log(trigger);
@@ -194,8 +207,13 @@ const TradingChart = () => {
     }
   };
 
-  function instantZoomOut(chart, factor = 1.2) {
-    if (!chart || !chart.xAxis || !chart.xAxis[0]) return;
+ 
+
+  const handleZoomOut = () => {
+    const chart = chartRef.current?.chart;
+    const factor=1.2;
+     if (!chart || !chart.xAxis || !chart.xAxis[0]) return;
+    console.log("inside instantZoomout");
     const min0 = chart.xAxis[0].min;
     const max0 = chart.xAxis[0].max;
     if (min0 == null || max0 == null) return;
@@ -211,25 +229,24 @@ const TradingChart = () => {
       true,
       { trigger: 'zoomout' }
     );
-  }
-
-  const handleZoomOut = () => {
-    const chart = chartRef.current?.chart;
-    instantZoomOut(chart);
   };
 
   useEffect(() => {
-    const container = chartContainerRef.current;
-    if (!container) return;
+    
     const onWheel = (e) => {
+      const chart = chartRef.current?.chart;
+      if(!chart){
+        return;
+      }
       if (e.ctrlKey || e.metaKey) return;
       if (e.deltaY > 0) {
+        console.log("inside zoomout hu bhai");
         handleZoomOut();
         e.preventDefault();
       }
     };
-    container.addEventListener('wheel', onWheel, { passive: false });
-    return () => container.removeEventListener('wheel', onWheel);
+    window.addEventListener('wheel', onWheel, { passive: false});
+    return () => window.removeEventListener('wheel', onWheel);
   }, [handleZoomOut]);
 
   const toggleFullScreen = () => {
@@ -291,6 +308,9 @@ const TradingChart = () => {
           { trigger: 'pan' }
         );      
       }
+      else{
+        console.log("printingkey",e.key);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -315,7 +335,8 @@ const TradingChart = () => {
     boost: {
         useGPUTranslations: true,
         // Chart-level boost when there are more than 5 series in the chart
-        seriesThreshold: 1
+        seriesThreshold: 1,
+       
     },
     plotOptions: {
       line: { marker: { enabled: false } }
