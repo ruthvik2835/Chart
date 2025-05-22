@@ -252,6 +252,7 @@ const TradingChart = () => {
 
 
     if (trigger === 'zoom' || trigger === 'pan' || trigger === undefined || trigger === 'zoomout') {
+        console.log(trigger);
         const currentVisibleSpan = max - min;
         const currentLoadedSpan = loadedRange.max - loadedRange.min;
 
