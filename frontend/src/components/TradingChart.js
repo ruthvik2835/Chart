@@ -281,7 +281,7 @@ const TradingChart = () => {
         const alignedMin = Math.floor(min / currentUnitMs) * currentUnitMs;
         const alignedMax = Math.ceil(max / currentUnitMs) * currentUnitMs;
 
-        if (currentVisibleSpan <= currentLoadedSpan * 0.3 && trigger !== 'zoomout') { // Zoomed in significantly
+        if (currentVisibleSpan <= currentLoadedSpan * 0.3 ) { // Zoomed in significantly
              console.log("Zoomed in significantly, refetching for higher detail or closer window", trigger);
              if (selectedSymbols.length > 0) fetchData(alignedMin, alignedMax, selectedSymbols);
              return;
@@ -327,7 +327,8 @@ const TradingChart = () => {
       if (e.deltaY > 0) { // Zoom out on scroll down
         handleZoomOut();
         e.preventDefault();
-      } else if (e.deltaY < 0) { // Zoom in on scroll up (Highcharts default zoomType: 'x' handles this if mouse over axis)
+      } 
+      else if (e.deltaY < 0) { // Zoom in on scroll up (Highcharts default zoomType: 'x' handles this if mouse over axis)
         // To make scroll up zoom in on chart area:
         const chart = chartRef.current?.chart;
         if (chart) {
