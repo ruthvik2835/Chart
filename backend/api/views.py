@@ -272,3 +272,8 @@ def get_items_equidistant(request):
             {'error': 'An unexpected error occurred during data retrieval.', 'details': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+    
+@api_view(['GET'])
+def available_symbols(request):
+    symbols = Item.objects.values_list('symbol', flat=True).distinct()
+    return Response({'symbols': list(symbols)})

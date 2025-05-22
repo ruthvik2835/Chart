@@ -98,7 +98,7 @@ const TradingChart = () => {
 
       const promises = symbolsToFetch.map(currentSymbol =>
         fetch(
-          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=500`
+          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1500`
         ).then(async resp => {
           if (!resp.ok) {
             const errorBody = await resp.text();
@@ -250,8 +250,12 @@ const TradingChart = () => {
     // Debounce or throttle this if it causes too many re-renders for plotBands
     setVisibleRange({ min, max });
 
+    if(trigger === undefined){
+        return;
+    }
 
-    if (trigger === 'zoom' || trigger === 'pan' || trigger === undefined || trigger === 'zoomout') {
+
+    if (trigger === 'zoom' || trigger === 'pan' || trigger === 'zoomout') {
         console.log(trigger);
         const currentVisibleSpan = max - min;
         const currentLoadedSpan = loadedRange.max - loadedRange.min;

@@ -9,4 +9,5 @@ urlpatterns = [
     path('items/<int:id>/edit/', EditItemView.as_view(), name='edit-item'),
     path('items/<int:id>/', get_item, name='get-item'),
     path('items/e/', get_items_equidistant, name='get_items_equidistant'),
+    path('items/symbols/', available_symbols, name='get_available_symbols'),
 ]
