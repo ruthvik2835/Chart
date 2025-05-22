@@ -1,43 +1,52 @@
 from django.core.management.base import BaseCommand
-from api.models import *
+from api.models import Item_1ms, Item_10ms
+from collections import defaultdict
 
 class Command(BaseCommand):
-    help = 'Aggregates Item data by millisecond and populates Item_1ms table with min and max prices.'
+    help = 'Aggregates Item_1ms data by 10 milliseconds and populates Item_10ms table with min and max prices.'
 
     def handle(self, *args, **options):
-        self.stdout.write("Starting millisecond aggregation...")
+        self.stdout.write("Starting 10-millisecond aggregation...")
 
-        count = 0
+        # Step 1: Fetch all Item_1ms records and aggregate data in memory
+        items_to_process = Item_1ms.objects.all().order_by('time')
+        total_count = items_to_process.count()
+        self.stdout.write(f"Total items to process: {total_count}")
 
-        items_to_process = Item_1ms.objects.all()
-
+        # Define the time truncation factor (10 milliseconds = 10,000 microseconds)
         n = 10000
 
-        for x in items_to_process:
-            time_10ms = x.time.replace(microsecond=(x.time.microsecond // n) * n)
-            millisecond_entry, created = Item_10ms.objects.get_or_create(
-                time=time_10ms,
-                symbol=x.symbol,
-                defaults={
-                    'min': x.min,
-                    'max': x.max
-                }
-            )
+        # Dictionary to store aggregated data: key=(time_10ms, symbol), value={'min': min_price, 'max': max_price}
+        aggregated_data_dict = defaultdict(lambda: {'min': float('inf'), 'max': float('-inf')})
 
-            if not created:
-                updated = False
-                if x.min < millisecond_entry.min:
-                    millisecond_entry.min = x.min
-                    updated = True
-                if x.max > millisecond_entry.max:
-                    millisecond_entry.max = x.max
-                    updated = True
-
-                if updated:
-                    millisecond_entry.save(update_fields=['min', 'max'])
+        count = 0
+        for item in items_to_process.iterator(chunk_size=10000):  # Process in chunks to manage memory
+            # Truncate microseconds to the nearest 10 milliseconds
+            time_10ms = item.time.replace(microsecond=(item.time.microsecond // n) * n)
+            key = (time_10ms, item.symbol)
+            aggregated_data_dict[key]['min'] = min(aggregated_data_dict[key]['min'], item.min)
+            aggregated_data_dict[key]['max'] = max(aggregated_data_dict[key]['max'], item.max)
 
             count += 1
-            if count % 1000 == 0:
+            if count % 10000 == 0:
                 self.stdout.write(f"Processed {count} items...")
+
+        self.stdout.write("Aggregation in memory complete. Preparing data for database operations...")
+
+        # Convert aggregated data dictionary to list of model instances
+        aggregated_instances = [
+            Item_10ms(
+                time=key[0],
+                symbol=key[1],
+                min=value['min'],
+                max=value['max']
+            )
+            for key, value in aggregated_data_dict.items()
+        ]
+        Item_10ms.objects.bulk_create(aggregated_instances)
+
+
+
+
 
         self.stdout.write(self.style.SUCCESS(f"Done. Processed {count} items total."))
