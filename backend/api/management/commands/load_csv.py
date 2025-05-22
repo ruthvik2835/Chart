@@ -52,10 +52,10 @@ class Command(BaseCommand):
         for item in parse_csv():
             batch.append(item)
             if len(batch) >= batch_size:
-                elapsed = time.time() - start_time
                 with transaction.atomic():
                     Item.objects.bulk_create(batch, batch_size=batch_size)
                 total_inserted += len(batch)
+                elapsed = time.time() - start_time
                 self.stdout.write(f"Inserted {total_inserted} items... Time taken: {elapsed / 60:.2f} minutes")
                 batch.clear()
 
