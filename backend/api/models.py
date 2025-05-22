@@ -4,15 +4,8 @@ from django.db import models
 class Item(models.Model):
     time = models.DateTimeField()
     symbol = models.CharField(max_length=100)
-    # price = models.IntegerField()
-    # volume = models.IntegerField()
-    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
-    c1 = models.FloatField()
-    c2 = models.FloatField()
-    c3 = models.FloatField()
-    c4 = models.FloatField()
-    c5 = models.FloatField()
-    c6 = models.FloatField()
+    price = models.FloatField()
+
 
     def __str__(self):
         return f"{self.time},symbol: {self.symbol},id: {self.id}"
@@ -21,25 +14,104 @@ class Item(models.Model):
         indexes = [
             models.Index(fields=['symbol', 'time']),
         ]
-
-class ItemAggregate(models.Model):
-    AGG_CHOICES = [
-        ('minute', 'Minute'),
-        ('hour', 'Hour'),
-        ('month', 'Month'),
-    ]
-
+class Item_1ms(models.Model):
+    time = models.DateTimeField()
     symbol = models.CharField(max_length=100)
-    time_group = models.DateTimeField()
-    aggregation_level = models.CharField(max_length=10, choices=AGG_CHOICES)
-    avg_price = models.FloatField()
-    total_volume = models.BigIntegerField()
+    # price = models.IntegerField()
+    # volume = models.IntegerField()
+    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
+    min = models.FloatField()
+    max = models.FloatField()
+
+    def __str__(self):
+        return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
 
     class Meta:
         indexes = [
-            models.Index(fields=['symbol', 'aggregation_level', 'time_group']),
+            models.Index(fields=['symbol', 'time']),
         ]
-        unique_together = ('symbol', 'aggregation_level', 'time_group')
+class Item_10ms(models.Model):
+    time = models.DateTimeField()
+    symbol = models.CharField(max_length=100)
+    # price = models.IntegerField()
+    # volume = models.IntegerField()
+    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
+    min = models.FloatField()
+    max = models.FloatField()
+
+    def __str__(self):
+        return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['symbol', 'time']),
+        ]
+class Item_100ms(models.Model):
+    time = models.DateTimeField()
+    symbol = models.CharField(max_length=100)
+    # price = models.IntegerField()
+    # volume = models.IntegerField()
+    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
+    min = models.FloatField()
+    max = models.FloatField()
+
+    def __str__(self):
+        return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['symbol', 'time']),
+        ]
+class Item_1s(models.Model):
+    time = models.DateTimeField()
+    symbol = models.CharField(max_length=100)
+    # price = models.IntegerField()
+    # volume = models.IntegerField()
+    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
+    min = models.FloatField()
+    max = models.FloatField()
+
+    def __str__(self):
+        return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['symbol', 'time']),
+        ]
+class Item_10s(models.Model):
+    time = models.DateTimeField()
+    symbol = models.CharField(max_length=100)
+    # price = models.IntegerField()
+    # volume = models.IntegerField()
+    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
+    min = models.FloatField()
+    max = models.FloatField()
+
+    def __str__(self):
+        return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['symbol', 'time']),
+        ]
+class Item_1min(models.Model):
+    time = models.DateTimeField()
+    symbol = models.CharField(max_length=100)
+    # price = models.IntegerField()
+    # volume = models.IntegerField()
+    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
+    min = models.FloatField()
+    max = models.FloatField()
+
+    def __str__(self):
+        return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['symbol', 'time']),
+        ]
+
+
 
     
 

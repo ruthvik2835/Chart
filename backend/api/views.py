@@ -26,6 +26,30 @@ class ItemListView(ListAPIView):
     queryset = Item.objects.all()
     serializer_class = ItemSerializer
 
+class Item_1msListView(ListAPIView):
+    queryset = Item_1ms.objects.all()
+    serializer_class = Item_1msSerializer
+
+class Item_10msListView(ListAPIView):
+    queryset = Item_10ms.objects.all()
+    serializer_class = Item_10msSerializer
+
+class Item_100msListView(ListAPIView):
+    queryset = Item_100ms.objects.all()
+    serializer_class = Item_100msSerializer
+
+class Item_1sListView(ListAPIView):
+    queryset = Item_1s.objects.all()
+    serializer_class = Item_1sSerializer
+
+class Item_10sListView(ListAPIView):
+    queryset = Item_10s.objects.all()
+    serializer_class = Item_10sSerializer
+
+class Item_1minListView(ListAPIView):
+    queryset = Item_1min.objects.all()
+    serializer_class = Item_1minSerializer
+
 
 class AddItemView(CreateAPIView):
     queryset = Item.objects.all()
