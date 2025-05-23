@@ -17,11 +17,11 @@ class Item(models.Model):
 class Item_1ms(models.Model):
     time = models.DateTimeField()
     symbol = models.CharField(max_length=100)
-    # price = models.IntegerField()
-    # volume = models.IntegerField()
-    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
     min = models.FloatField()
     max = models.FloatField()
+    min_time = models.DateTimeField()
+    max_time = models.DateTimeField()
+
 
     def __str__(self):
         return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
@@ -33,11 +33,10 @@ class Item_1ms(models.Model):
 class Item_10ms(models.Model):
     time = models.DateTimeField()
     symbol = models.CharField(max_length=100)
-    # price = models.IntegerField()
-    # volume = models.IntegerField()
-    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
     min = models.FloatField()
     max = models.FloatField()
+    min_time = models.DateTimeField()
+    max_time = models.DateTimeField()
 
     def __str__(self):
         return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
@@ -49,11 +48,10 @@ class Item_10ms(models.Model):
 class Item_100ms(models.Model):
     time = models.DateTimeField()
     symbol = models.CharField(max_length=100)
-    # price = models.IntegerField()
-    # volume = models.IntegerField()
-    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
     min = models.FloatField()
     max = models.FloatField()
+    min_time = models.DateTimeField()
+    max_time = models.DateTimeField()
 
     def __str__(self):
         return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
@@ -65,11 +63,10 @@ class Item_100ms(models.Model):
 class Item_1s(models.Model):
     time = models.DateTimeField()
     symbol = models.CharField(max_length=100)
-    # price = models.IntegerField()
-    # volume = models.IntegerField()
-    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
     min = models.FloatField()
     max = models.FloatField()
+    min_time = models.DateTimeField()
+    max_time = models.DateTimeField()
 
     def __str__(self):
         return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
@@ -81,11 +78,10 @@ class Item_1s(models.Model):
 class Item_10s(models.Model):
     time = models.DateTimeField()
     symbol = models.CharField(max_length=100)
-    # price = models.IntegerField()
-    # volume = models.IntegerField()
-    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
     min = models.FloatField()
     max = models.FloatField()
+    min_time = models.DateTimeField()
+    max_time = models.DateTimeField()
 
     def __str__(self):
         return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
@@ -97,11 +93,10 @@ class Item_10s(models.Model):
 class Item_1min(models.Model):
     time = models.DateTimeField()
     symbol = models.CharField(max_length=100)
-    # price = models.IntegerField()
-    # volume = models.IntegerField()
-    # metrics = ArrayField(models.FloatField(), size=6) #->postgresql
     min = models.FloatField()
     max = models.FloatField()
+    min_time = models.DateTimeField()
+    max_time = models.DateTimeField()
 
     def __str__(self):
         return f"{self.time},symbol: {self.symbol},min&max: {self.min} & {self.max}"
