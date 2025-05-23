@@ -21,6 +21,11 @@ import io
 from django.utils.timezone import make_aware, is_aware
 from django.db.models.functions import TruncMinute, TruncHour, TruncMonth
 import math
+from concurrent.futures import ThreadPoolExecutor
+import boto3
+timestream_query = boto3.client('timestream-query')
+DATABASE_NAME = 'sampleDB'
+TABLE_NAME = 'milli_data'
 
 class ItemListView(ListAPIView):
     queryset = Item.objects.all()
@@ -58,6 +63,58 @@ def round_to_nearest_multiple(timestamp_float, multiple_seconds):
         return timestamp_float
     # Standard rounding: floor(x / m + 0.5) * m
     return math.floor(timestamp_float / multiple_seconds + 0.5) * multiple_seconds
+
+def fetch_items_by_chunk(symbol, time_chunk):
+    results = []
+
+    for ts in time_chunk:
+        iso_ts = ts.isoformat()
+        query = f"""
+            SELECT time, measure_name, measure_value::double 
+            FROM "{DATABASE_NAME}"."{TABLE_NAME}" 
+            WHERE Symbol = '{symbol}' 
+              AND time = from_iso8601_timestamp('{iso_ts}')
+        """
+
+        try:
+            response = timestream_query.query(QueryString=query)
+            for row in response['Rows']:
+                record = {col['Name']: val.get('ScalarValue') for col, val in zip(response['ColumnInfo'], row['Data'])}
+                record['timestamp'] = iso_ts
+                results.append(record)
+        except Exception as e:
+            print(f"Error querying Timestream for timestamp {iso_ts}: {e}")
+
+    return results
+
+
+def split_list(input_list, num_chunks):
+    avg = len(input_list) // num_chunks
+    return [input_list[i * avg:(i + 1) * avg] for i in range(num_chunks - 1)] + [input_list[(num_chunks - 1) * avg:]]
+def get_time_bounds_from_timestream(symbol):
+    query = f"""
+        SELECT MIN(time) as first_time, MAX(time) as last_time
+        FROM "{DATABASE_NAME}"."{TABLE_NAME}"
+        WHERE Symbol = '{symbol}'
+    """
+    try:
+        response = timestream_query.query(QueryString=query)
+        row = response['Rows'][0]['Data']
+        first_time_str = row[0].get('ScalarValue')
+        last_time_str = row[1].get('ScalarValue')
+
+        if not first_time_str or not last_time_str:
+            return None, None
+
+        # Parse ISO8601 timestamps to Python datetime
+        from datetime import datetime
+        first_time = datetime.fromisoformat(first_time_str.replace('Z', '+00:00'))
+        last_time = datetime.fromisoformat(last_time_str.replace('Z', '+00:00'))
+        return first_time, last_time
+
+    except Exception as e:
+        print(f"Error querying Timestream time bounds: {e}")
+        return None, None
 
 
 @api_view(['GET'])
@@ -141,22 +198,17 @@ def get_items_equidistant(request):
         )
 
     # print("here 2")
-    first_item = Item.objects.filter(symbol=symbol).order_by('time').first()
-    last_item = Item.objects.filter(symbol=symbol).order_by('-time').first()
+    first_time, last_time = get_time_bounds_from_timestream(symbol)
 
-    if not first_item or not last_item:
+    if not first_time or not last_time:
         return Response(
             {'error': f'No data found for symbol "{symbol}".'},
             status=status.HTTP_404_NOT_FOUND
         )
 
-    first_time = first_item.time
-    last_time = last_item.time
-
     clamped_start_date = max(start_date, first_time)
     clamped_end_date = min(end_date, last_time)
 
-    # --- Validate clamped range ---
     if clamped_start_date > clamped_end_date:
         return Response({
             'error': 'After clamping to available data range, start_date > end_date.',
@@ -169,7 +221,6 @@ def get_items_equidistant(request):
                 'available_end_date': last_time.isoformat()
             }
         }, status=status.HTTP_400_BAD_REQUEST)
-
 
     # --- 7. Align start_date and end_date to the NEAREST multiple of time_gap_seconds ---
     start_timestamp = clamped_start_date.timestamp()
@@ -230,21 +281,34 @@ def get_items_equidistant(request):
             # For most cases, the above calculation is sufficient. If strict adherence to aligned_end_dt is needed:
             # if N > 1 and times_to_query and total_duration_seconds > 0 : 
             # times_to_query[-1] = aligned_end_dt
-
+# def perf():                            
+#     a = time.time()
+#     items = Item.objects.filter()      
+#     serializer = ItemSerializer(items, many=True).data
+#     b = round(time.time() - a, 4)     
+#     print(a, b)     
     # print("here 4")
     # --- 10. Query the database using the actual Item model ---
+
     try:
-        items = Item.objects.filter(symbol=symbol, time__in=times_to_query)
+        NUM_THREADS = 4
+        chunks = split_list(times_to_query, NUM_THREADS)
 
-        # print("here 5")
-        
-        serializer = ItemSerializer(items, many=True)
+        with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
+            futures = [executor.submit(fetch_items_by_chunk, symbol, chunk) for chunk in chunks]
+            all_items = []
+            for future in futures:
+                all_items.extend(future.result())
 
-        # print("here 6")
+        measure_1 = time.time() - start_time_measurement
+        print(round(measure_1, 4))
+        # serializer = ItemSerializer(all_items, many=True)
+        # # print("here 6")
+        # data1=serializer.data
         duration_measurement = time.time() - start_time_measurement
 
         stats = {
-            "count": len(serializer.data), 
+            "count": len(all_items), 
             "performance": {
                 "duration_seconds": round(duration_measurement, 4)
             },
@@ -263,8 +327,8 @@ def get_items_equidistant(request):
         }
 
         print(stats)
+        return Response(all_items, status=status.HTTP_200_OK)
         
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
     except Exception as e:
         print(str(e))

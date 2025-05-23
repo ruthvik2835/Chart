@@ -83,7 +83,7 @@ const TradingChart = () => {
       const endISO = new Date(max+d).toISOString();
       console.log(startISO,endISO);
       const resp = await fetch(
-        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=500`
+        `/api/items/e/?symbol=${symbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=5000`
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -110,7 +110,7 @@ const TradingChart = () => {
         { name: 'c6', data: c6, type: 'line', color: COLORS[5] }
       ];
       setRawSeries(raw);
-      // console.log(raw.length);
+      console.log(c1.length);
       // Set seriesData with visibility
       setSeriesData(
         raw.map((s, i) => ({ ...s, visible: visibleColumns[s.name],boostThreshold:1 }))
