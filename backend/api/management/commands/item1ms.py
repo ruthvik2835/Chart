@@ -6,11 +6,14 @@ from collections import defaultdict
 class Command(BaseCommand):
     help = 'Aggregates Item data by millisecond and populates Item_1ms table with min and max prices using serializer and bulk create.'
 
+    def add_arguments(self, parser):
+        parser.add_argument('symbol', type=str, help='Symbol to aggregate data for')
     def handle(self, *args, **options):
         self.stdout.write("Starting millisecond aggregation...")
-
+        symbol = options['symbol']
+        self.stdout.write(f"Starting millisecond aggregation for symbol: {symbol}")
         # Step 1: Fetch all items and aggregate data in memory
-        items_to_process = Item.objects.all().order_by('time')
+        items_to_process = Item.objects.filter(symbol=symbol).order_by('time')
         total_count = items_to_process.count()
         self.stdout.write(f"Total items to process: {total_count}")
 

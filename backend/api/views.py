@@ -40,62 +40,43 @@ SERIALIZER_MAP = {
     60000: Item_1minSerializer,
 }
 
-def compute_frame_and_timestamps_ms_aligned(start_dt, end_dt, N):
+from datetime import timedelta
+from django.utils import timezone
+
+def compute_best_frame_and_timestamps_by_data(start_dt, end_dt, N, symbol):
     """
-    Returns:
-      frame_ms: int          # chosen interval in milliseconds
-      timestamps: List[str]  # ISO timestamps aligned to multiples of frame_ms
+    Select the most granular (smallest) frame_ms whose model has <= N points
+    for the given symbol in the time range. Return aligned timestamps using that frame_ms.
     """
-    # 1) Compute total span in ms
-    total_ms = int((end_dt - start_dt).total_seconds() * 1000)
-    if total_ms <= 0 or N <= 0:
+
+    best_frame_ms = None
+    timestamps = []
+    
+    for frame_ms in sorted(MODEL_MAP.keys()):
+        model = MODEL_MAP[frame_ms]
+
+        count = model.objects.filter(symbol=symbol, time__gte=start_dt, time__lte=end_dt).count()
+        if count <= N:
+            best_frame_ms = frame_ms
+            break  # smallest acceptable frame_ms found
+
+    if best_frame_ms is None:
         return None, []
 
-    # 2) Raw ideal step in ms, rounding up
-    raw_step_ms = (total_ms) // N
-
-    # 3) Allowed frames (all in ms)
-    allowed_ms = [
-        1,    # 1 ms
-        # 5,    # 5 ms
-        10,   # 10 ms
-        # 50,   # 50 ms
-        100,  # 100 ms
-        # 500,  # 500 ms
-        1000,    # 1 s
-        # 5000,    # 5 s
-        10000,   # 10 s
-        60000,   # 1 min
-        # 300000,  # 5 min
-        # 600000,  # 10 min
-    ]
-
-
-    # 4) Pick the smallest allowed >= raw_step_ms, else the largest
-    frame_ms = next((f for f in allowed_ms if f >= raw_step_ms), allowed_ms[-1])
-
-    print(frame_ms)
-
-    # 5) Align the first timestamp:
-    #    find start_ms since epoch, then round *up* to nearest multiple of frame_ms
+    # Align timestamps to best_frame_ms
+    step = timedelta(milliseconds=best_frame_ms)
     start_ms = int(start_dt.timestamp() * 1000)
-    mod = start_ms % frame_ms
-    if mod == 0:
-        aligned_start_ms = start_ms
-    else:
-        aligned_start_ms = start_ms + (frame_ms - mod)
+    mod = start_ms % best_frame_ms
+    aligned_start_ms = start_ms if mod == 0 else start_ms + (best_frame_ms - mod)
+    aligned_start_dt = start_dt + timedelta(milliseconds=(aligned_start_ms - start_ms))
 
-    # 6) Build the timestamp list
-    timestamps = []
-    step = timedelta(milliseconds=frame_ms)
-    cur_dt = start_dt + timedelta(milliseconds=(aligned_start_ms - start_ms))
-    # note: cur_dt is the aligned first timestamp
-
+    cur_dt = aligned_start_dt
     while cur_dt <= end_dt:
         timestamps.append(cur_dt.isoformat())
         cur_dt += step
 
-    return frame_ms, timestamps
+    return best_frame_ms
+
 
 
 class ItemListView(ListAPIView):
@@ -260,44 +241,45 @@ def get_items_equidistant(request):
             }
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    frame_ms,times_to_query=compute_frame_and_timestamps_ms_aligned(clamped_start_date,clamped_end_date,N)
-
+    frame_ms=compute_best_frame_and_timestamps_by_data(clamped_start_date,clamped_end_date,N,symbol)
+    timeframeselection_time=time.time()-start_time_measurement
 
     # print("here 4")
     # --- 10. Query the database using the actual Item model ---
     try:
         model_class = MODEL_MAP.get(frame_ms)
         
-        items = model_class.objects.filter(symbol=symbol, time__in=times_to_query)
+        items = model_class.objects.filter(symbol=symbol, time__gte=clamped_start_date, time__lte=clamped_end_date)
 
         # print("here 5")
 
         serializer_class = SERIALIZER_MAP.get(frame_ms)       
         serializer = serializer_class(items, many=True)
-
+        response = {
+            'data': serializer.data,
+            'framems': frame_ms
+        }
         # print("here 6")
         duration_measurement = time.time() - start_time_measurement
 
         stats = {
             "count": len(serializer.data), 
             "performance": {
-                "duration_seconds": round(duration_measurement, 4)
+                "duration_seconds": round(duration_measurement, 4),
+                "timeframe selection time": round(timeframeselection_time,4),
             },
             "query_details": {
                 "symbol": symbol,
                 "requested_start_date": start_date_str,
                 "requested_end_date": end_date_str,
                 "N_points_requested": N,
-                "num_timestamps_generated": len(times_to_query),
+                # "num_timestamps_generated": len(times_to_query),
                 # "generated_timestamps_iso": [t.isoformat() for t in times_to_query] # Uncomment for debugging; can be verbose
             },
               
         }
 
-        response = {
-            'data': serializer.data,
-            'framems': frame_ms
-        }
+       
 
         print(stats)
         
