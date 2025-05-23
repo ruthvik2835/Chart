@@ -8,7 +8,7 @@ const SYMBOLS = ['BTC-USDT']; // Added MSFT for more options
 const DEFAULT_VISIBLE_COLUMNS = {
   min: true, max: true
 };
-const DEFAULT_TIMEFRAME = '1min';
+const DEFAULT_TIMEFRAME = '1ms';
 const DEFAULT_YSCALE = 'linear';
 const DEFAULT_SELECTED_SYMBOLS = ['BTC-USDT']; // Default to AMZN
 
@@ -27,6 +27,21 @@ function parseTimeGapToSeconds(timeStr) {
     default: return value;
   }
 }
+const time_map = {
+    1: '1ms',
+    5: '5ms',
+    10: '10ms',
+    50: '50ms',
+    100: '100ms',
+    500: '500ms',
+    1000: '1s',
+    5000: '5s',
+    10000: '10s',
+    60000: '1min',
+    300000: '5min',
+    600000: '10min',
+}
+
 
 const generateDayBands = (min, max) => {
   const bands = [];
@@ -72,6 +87,7 @@ const TradingChart = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE_COLUMNS);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [framems,setFramems] = useState('1ms');
 
 
   const fetchData = useCallback(async (min, max, symbolsToFetch) => {
@@ -97,7 +113,7 @@ const TradingChart = () => {
 
       const promises = symbolsToFetch.map(currentSymbol =>
         fetch(
-          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1500`
+          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=10000`
         ).then(async resp => {
           if (!resp.ok) {
             const errorBody = await resp.text();
@@ -111,19 +127,21 @@ const TradingChart = () => {
 
       const newRawSeries = [];
       let colorIndex = 0; // For assigning colors if we have many symbol-column combinations
+      let curr_framems=1;
 
       results.forEach(result => {
         // const { symbol: currentSymbol, data: symbolSpecificData } = result;
         const { symbol: currentSymbol, data: responseData } = result;
-        console.log("responseData: ",responseData);
+
         const symbolSpecificData = responseData.data || responseData;
+        curr_framems=responseData.framems
+        console.log("length: ",symbolSpecificData.length)
 
         // Prepare arrays for min and max for the current symbol
         const symbolColumnData = { min: [], max: [] };
 
         symbolSpecificData.forEach(item => {
-          console.log("item: ",item);
-          const t = new Date(item.timestamp).getTime(); // Changed from item.time to item.timestamp
+          const t = new Date(item.time).getTime(); // Changed from item.time to item.timestamp
           COLUMN_KEYS.forEach(colKey => {
             if (item[colKey] !== undefined && item[colKey] !== null) {
                  symbolColumnData[colKey].push([t, Number(item[colKey])]);
@@ -148,7 +166,7 @@ const TradingChart = () => {
         });
         colorIndex += 2; // Increment by 2 to differentiate colors between symbols
       });
-      
+      setFramems(time_map[curr_framems]);
       setRawSeries(newRawSeries);
       setLoadedRange({ min: fetchStartDate.getTime(), max: fetchEndDate.getTime() });
       console.log(`Fetch successful for ${symbolsToFetch.join(', ')}. Time taken: ${performance.now() - startTimeMs}ms. Series count: ${newRawSeries.length}`);
@@ -275,7 +293,7 @@ const TradingChart = () => {
         const alignedMin = Math.floor(min / currentUnitMs) * currentUnitMs;
         const alignedMax = Math.ceil(max / currentUnitMs) * currentUnitMs;
 
-        if (currentVisibleSpan <= currentLoadedSpan * 0.3 ) { // Zoomed in significantly
+        if (currentVisibleSpan <= currentLoadedSpan * 0.3 && framems != '1ms') { // Zoomed in significantly
              console.log("Zoomed in significantly, refetching for higher detail or closer window", trigger);
              if (selectedSymbols.length > 0) fetchData(alignedMin, alignedMax, selectedSymbols);
              return;
@@ -386,7 +404,7 @@ const TradingChart = () => {
       animation: false,
       events: {}
     },
-    title: { text: `Trading Chart (${selectedSymbols.join(', ') || 'No Symbol Selected'} - ${timeframe})` },
+    title: { text: `Trading Chart (${selectedSymbols.join(', ') || 'No Symbol Selected'} - ${framems})` },
     xAxis: {
       type: 'datetime',
       ordinal: false,
@@ -541,7 +559,6 @@ const TradingChart = () => {
           padding: '6px 12px', borderRadius: '4px', border: '1px solid #ced4da', cursor: 'pointer', background: '#6c757d', color: '#fff'
         }}>Fullscreen</button>
       </div>
-      <div style={{ flexGrow: 1, position: 'relative' }}>
         <HighchartsReact
           highcharts={Highcharts}
           constructorType="stockChart"
@@ -549,7 +566,6 @@ const TradingChart = () => {
           ref={chartRef}
           containerProps={{ style: { height: '100%' } }}
         />
-      </div>
     </div>
   );
 };

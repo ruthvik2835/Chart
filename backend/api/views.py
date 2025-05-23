@@ -52,7 +52,7 @@ def compute_frame_and_timestamps_ms_aligned(start_dt, end_dt, N):
         return None, []
 
     # 2) Raw ideal step in ms, rounding up
-    raw_step_ms = (total_ms + N - 1) // N
+    raw_step_ms = (total_ms) // N
 
     # 3) Allowed frames (all in ms)
     allowed_ms = [
@@ -73,6 +73,8 @@ def compute_frame_and_timestamps_ms_aligned(start_dt, end_dt, N):
 
     # 4) Pick the smallest allowed >= raw_step_ms, else the largest
     frame_ms = next((f for f in allowed_ms if f >= raw_step_ms), allowed_ms[-1])
+
+    print(frame_ms)
 
     # 5) Align the first timestamp:
     #    find start_ms since epoch, then round *up* to nearest multiple of frame_ms
@@ -170,7 +172,7 @@ def get_items_equidistant(request):
     symbol = request.query_params.get('symbol')
     start_date_str = request.query_params.get('start_date')
     end_date_str = request.query_params.get('end_date')
-    time_gap_str = request.query_params.get('time_gap')  # For aligning start/end dates
+    # time_gap_str = request.query_params.get('time_gap')  # For aligning start/end dates
     N_str = request.query_params.get('N')               # Number of equidistant points
 
     # print("here 1")
@@ -189,16 +191,6 @@ def get_items_equidistant(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # --- 2. Parse and validate time_gap_seconds (now allows float) ---
-    try:
-        time_gap_seconds = float(time_gap_str) # Changed to float
-        if time_gap_seconds <= 0:
-            raise ValueError("time_gap must be positive")
-    except ValueError:
-        return Response(
-            {'error': '"time_gap" must be a positive number representing seconds (e.g., 60, 0.5 for 500ms, or 0.001 for 1ms).'}, # Updated error message
-            status=status.HTTP_400_BAD_REQUEST
-        )
 
     # --- 3. Parse and validate N (number of points) ---
     try:
@@ -295,7 +287,6 @@ def get_items_equidistant(request):
                 "symbol": symbol,
                 "requested_start_date": start_date_str,
                 "requested_end_date": end_date_str,
-                "time_gap_alignment_seconds": time_gap_seconds,
                 "N_points_requested": N,
                 "num_timestamps_generated": len(times_to_query),
                 # "generated_timestamps_iso": [t.isoformat() for t in times_to_query] # Uncomment for debugging; can be verbose
