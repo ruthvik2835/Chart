@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Highcharts from 'highcharts/highstock';
 import HighchartsReact from 'highcharts-react-official';
-import Boost from 'highcharts/modules/boost';
+// import Boost from 'highcharts/modules/boost';
 
 
 const SYMBOLS = ['A','B','C','D','E']; // Added MSFT for more options
@@ -141,8 +141,17 @@ const TradingChart = () => {
         const symbolColumnData = { min: [], max: [] };
 
         symbolSpecificData.forEach(item => {
-          const t = new Date(item.time).getTime(); // Changed from item.time to item.timestamp
+          // const t = new Date(item.time).getTime(); // Changed from item.time to item.timestamp
+          console.log(item);
           COLUMN_KEYS.forEach(colKey => {
+            let t=0;
+            if(colKey=='max'){
+              t= new Date(item.max_time).getTime();
+            }
+            else{
+              t= new Date(item.min_time).getTime();
+            }
+
             if (item[colKey] !== undefined && item[colKey] !== null) {
                   let value = Number(item[colKey]);
 
@@ -166,7 +175,9 @@ const TradingChart = () => {
             symbol: currentSymbol, // Store original symbol
             column: colKey,       // Store original column key (min, max)
             boostThreshold: 1,    // Enable boost for series
-            turboThreshold: 2000  // For line series, default is 1000. Can be increased.
+            turboThreshold: 2000,  // For line series, default is 1000. Can be increased.
+            dataGrouping:{enabled:false},
+
           });
         });
         colorIndex += 2; // Increment by 2 to differentiate colors between symbols
@@ -426,14 +437,14 @@ const TradingChart = () => {
     tooltip: {
       shared: true,
       xDateFormat: '%Y-%m-%d %H:%M:%S.%L',
-      valueDecimals: 2,
+      valueDecimals: 6,
     },
     legend: {
         enabled: true,
     },
     series: seriesData,
     boost: {
-        useGPUTranslations: true,
+        useGPUTranslations: false,
         seriesThreshold: 1,
     },
     plotOptions: {
