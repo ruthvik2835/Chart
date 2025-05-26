@@ -56,24 +56,9 @@ def compute_best_frame_and_timestamps_by_data(start_dt, end_dt, N, symbol):
         model = MODEL_MAP[frame_ms]
 
         count = model.objects.filter(symbol=symbol, time__gte=start_dt, time__lte=end_dt).count()
+        best_frame_ms = frame_ms
         if count <= N:
-            best_frame_ms = frame_ms
             break  # smallest acceptable frame_ms found
-
-    if best_frame_ms is None:
-        return None, []
-
-    # Align timestamps to best_frame_ms
-    step = timedelta(milliseconds=best_frame_ms)
-    start_ms = int(start_dt.timestamp() * 1000)
-    mod = start_ms % best_frame_ms
-    aligned_start_ms = start_ms if mod == 0 else start_ms + (best_frame_ms - mod)
-    aligned_start_dt = start_dt + timedelta(milliseconds=(aligned_start_ms - start_ms))
-
-    cur_dt = aligned_start_dt
-    while cur_dt <= end_dt:
-        timestamps.append(cur_dt.isoformat())
-        cur_dt += step
 
     return best_frame_ms
 

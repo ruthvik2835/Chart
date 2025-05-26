@@ -4,13 +4,13 @@ import HighchartsReact from 'highcharts-react-official';
 import Boost from 'highcharts/modules/boost';
 
 
-const SYMBOLS = ['BTC-USDT']; // Added MSFT for more options
+const SYMBOLS = ['A','B','C','D','E']; // Added MSFT for more options
 const DEFAULT_VISIBLE_COLUMNS = {
   min: true, max: true
 };
 const DEFAULT_TIMEFRAME = '1ms';
 const DEFAULT_YSCALE = 'linear';
-const DEFAULT_SELECTED_SYMBOLS = ['BTC-USDT']; // Default to AMZN
+const DEFAULT_SELECTED_SYMBOLS = ['A']; // Default to AMZN
 
 const oneDay = 24 * 3600 * 1000;
 function parseTimeGapToSeconds(timeStr) {
@@ -113,7 +113,7 @@ const TradingChart = () => {
 
       const promises = symbolsToFetch.map(currentSymbol =>
         fetch(
-          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=10000`
+          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1000`
         ).then(async resp => {
           if (!resp.ok) {
             const errorBody = await resp.text();
@@ -144,7 +144,12 @@ const TradingChart = () => {
           const t = new Date(item.time).getTime(); // Changed from item.time to item.timestamp
           COLUMN_KEYS.forEach(colKey => {
             if (item[colKey] !== undefined && item[colKey] !== null) {
-                 symbolColumnData[colKey].push([t, Number(item[colKey])]);
+                  let value = Number(item[colKey]);
+
+                  if (colKey === "max") {
+                      value += 0.1;
+                  }
+                 symbolColumnData[colKey].push([t, value]);
             }
           });
         });
@@ -487,7 +492,7 @@ const TradingChart = () => {
   
   if (isLoading) {
     if (chartRef.current && chartRef.current.chart) {
-        chartRef.current.chart.showLoading('Updating data...');
+        // chartRef.current.chart.showLoading('Updating data...');
     }
   } else {
     if (chartRef.current && chartRef.current.chart) {
