@@ -3,14 +3,14 @@ import Highcharts from 'highcharts/highstock';
 import HighchartsReact from 'highcharts-react-official';
 // import Boost from 'highcharts/modules/boost';
 
-
-const SYMBOLS = ['BTC-USDT']; // Added MSFT for more options
+const scale={'BTC-USDT-SWAP':1 , 'XRP-USDT-SWAP':44000, 'ETH-USDT-SWAP':41};
+const SYMBOLS = ['BTC-USDT-SWAP','XRP-USDT-SWAP','ETH-USDT-SWAP']; // Added MSFT for more options
 const DEFAULT_VISIBLE_COLUMNS = {
   min: true, max: true
 };
 const DEFAULT_TIMEFRAME = '1ms';
 const DEFAULT_YSCALE = 'linear';
-const DEFAULT_SELECTED_SYMBOLS = ['BTC-USDT']; // Default to AMZN
+const DEFAULT_SELECTED_SYMBOLS = ['BTC-USDT-SWAP']; // Default to AMZN
 
 const oneDay = 24 * 3600 * 1000;
 function parseTimeGapToSeconds(timeStr) {
@@ -153,7 +153,7 @@ const TradingChart = () => {
             }
 
             if (item[colKey] !== undefined && item[colKey] !== null) {
-                 symbolColumnData[colKey].push([t, Number(item[colKey])]);
+                 symbolColumnData[colKey].push([t, Number(item[colKey])*scale[currentSymbol]]);
             }
           });
         });
