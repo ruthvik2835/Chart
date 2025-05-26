@@ -191,6 +191,32 @@ const TradingChart = () => {
       setIsLoading(false);
     }
   }, [timeframe]); // timeframe is a key dependency for parseTimeGapToSeconds and API query
+  function debounceAsync(fn, delay) {
+  let timer;
+  return function (...args) {
+    clearTimeout(timer);
+    return new Promise(resolve => {
+      timer = setTimeout(() => resolve(fn(...args)), delay);
+    });
+  };
+}
+
+const debouncedFetchData = useMemo(() => debounceAsync(fetchData, 10), [fetchData]);
+
+// Effect for initial data load
+useEffect(() => {
+  if (!initialLoadDone && selectedSymbols.length > 0) {
+    console.log("Initial chart setup and fetch!");
+    const now = Date.now();
+    const initialMin = now - (7 * oneDay); // Default to 7 days back
+    const initialMax = now;
+
+    setVisibleRange({ min: initialMin, max: initialMax });
+    debouncedFetchData(initialMin, initialMax, selectedSymbols);
+    setInitialLoadDone(true);
+  }
+}, [selectedSymbols, debouncedFetchData, initialLoadDone]);
+
 
   // Effect for initial data load
   useEffect(() => {
@@ -201,10 +227,10 @@ const TradingChart = () => {
       const initialMax = now;
       
       setVisibleRange({ min: initialMin, max: initialMax });
-      fetchData(initialMin, initialMax, selectedSymbols);
+      debouncedFetchData(initialMin, initialMax, selectedSymbols);
       setInitialLoadDone(true);
     }
-  }, [selectedSymbols, fetchData, initialLoadDone]);
+  }, [selectedSymbols, debouncedFetchData, initialLoadDone]);
 
   // Effect for changes in selected symbols
   useEffect(() => {
@@ -226,7 +252,7 @@ const TradingChart = () => {
         fetchMax = now;
         setVisibleRange({ min: fetchMin, max: fetchMax });
       }
-      fetchData(fetchMin, fetchMax, selectedSymbols);
+      debouncedFetchData(fetchMin, fetchMax, selectedSymbols);
     } else {
       setIsLoading(false); // Ensure loading is off if no symbols
     }
@@ -241,14 +267,14 @@ const TradingChart = () => {
     setRawSeries([]);
 
     if (selectedSymbols.length > 0 && visibleRange.min !== null && visibleRange.max !== null) {
-      fetchData(visibleRange.min, visibleRange.max, selectedSymbols);
+      debouncedFetchData(visibleRange.min, visibleRange.max, selectedSymbols);
     } else if (selectedSymbols.length > 0) {
         // Fallback if visibleRange is somehow not set
         const now = Date.now();
         const defaultMin = now - (7 * oneDay);
         const defaultMax = now;
         setVisibleRange({min: defaultMin, max: defaultMax});
-        fetchData(defaultMin, defaultMax, selectedSymbols);
+        debouncedFetchData(defaultMin, defaultMax, selectedSymbols);
     }
   }, [timeframe, initialLoadDone]);
 
@@ -306,16 +332,16 @@ const TradingChart = () => {
 
         if (currentVisibleSpan <= currentLoadedSpan * 0.3 && framems != '1ms') { // Zoomed in significantly
              console.log("Zoomed in significantly, refetching for higher detail or closer window", trigger);
-             if (selectedSymbols.length > 0) fetchData(alignedMin, alignedMax, selectedSymbols);
+             if (selectedSymbols.length > 0) debouncedFetchData(alignedMin, alignedMax, selectedSymbols);
              return;
         }
 
         if (needsFetch && selectedSymbols.length > 0) {
             console.log(`AfterSetExtremes (${trigger}): Fetching new data. Range: ${new Date(alignedMin).toISOString()} to ${new Date(alignedMax).toISOString()}`);
-            fetchData(alignedMin, alignedMax, selectedSymbols);
+            debouncedFetchData(alignedMin, alignedMax, selectedSymbols);
         }
     }
-  }, [isLoading, loadedRange, selectedSymbols, fetchData, timeframe]);
+  }, [isLoading, loadedRange, selectedSymbols, debouncedFetchData, timeframe]);
 
   function instantZoomOut(chart, factor = 1.2) {
     if (!chart || !chart.xAxis || !chart.xAxis[0]) return;
