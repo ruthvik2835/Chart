@@ -244,6 +244,8 @@ def get_items_equidistant(request):
             'data': serializer.data,
             'framems': frame_ms
         }
+
+        # print(response)
         # print("here 6")
         duration_measurement = time.time() - start_time_measurement
 
