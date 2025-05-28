@@ -14,6 +14,18 @@ FRAME_TABLE_MAP = {
     10000:'Item_10s',
     60000:'Item_1min',
 }
+def list_to_q_symbols(symbol_list):
+    """
+    Convert a Python list of symbols to q/kdb+ symbol list format.
+    
+    Args:
+        symbol_list (list): List of symbol strings
+        
+    Returns:
+        str: Formatted string in q/kdb+ symbol format (`A`B`C)
+    """
+    return '`' + '`'.join(symbol_list)
+
 KDB_EPOCH = datetime(2000, 1, 1)
 def serialize(q_result):
     col_dict = q_result.py(raw=True)
@@ -81,11 +93,15 @@ def compute_best_frame_ms(start_iso: str, end_iso: str, N: int, symbol: str) -> 
 def get_items_equidistant(request):
     # Validate params
     start_time=time.time()
-    symbol     = request.query_params.get('symbol')
+    symbols_str     = request.query_params.get('symbol')
     start_date = request.query_params.get('start_date')
     end_date   = request.query_params.get('end_date')
     N_str      = request.query_params.get('N')
     missing = [p for p in ('symbol','start_date','end_date','N') if not request.query_params.get(p)]
+    symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
+    print("symbols: ",symbols)
+    if not symbols:
+        return Response({"error": "Invalid or empty symbols list"}, status=400)
     if missing:
         return Response({'error': f"Missing parameters: {', '.join(missing)}"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -103,14 +119,16 @@ def get_items_equidistant(request):
         return Response({'error': 'start_date must be before end_date.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Pick best frame
-    frame_ms = compute_best_frame_ms(to_q_timestamp(start_date), to_q_timestamp(end_date), N, symbol)
+    frame_ms = compute_best_frame_ms(to_q_timestamp(start_date), to_q_timestamp(end_date), N, symbols[0])
     print(frame_ms)
     tbl = FRAME_TABLE_MAP[frame_ms]
+
+
 
     # Final query
     qcmd = (
         f"0! select from {tbl} "
-        f"where symbol=`{symbol}, time within({to_q_timestamp(start_date)};{to_q_timestamp(end_date)})"
+        f"where symbol in ({list_to_q_symbols(symbols)}), time within({to_q_timestamp(start_date)};{to_q_timestamp(end_date)})"
     )
     try:
         with kx.QConnection(host='localhost', port=5000) as q:

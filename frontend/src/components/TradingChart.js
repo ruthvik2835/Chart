@@ -103,90 +103,117 @@ const TradingChart = () => {
 
     setIsLoading(true);
     try {
-      const startTimeMs = performance.now();
-      const dataWindowRange = max - min; // "d" in original code
-      // Fetch a bit more data than currently visible to allow some panning without immediate refetch
-      const fetchStartDate = new Date(min - dataWindowRange);
-      const fetchEndDate = new Date(max + dataWindowRange);
-      
-      const startISO = fetchStartDate.toISOString();
-      const endISO = fetchEndDate.toISOString();
+ const startTimeMs = performance.now();
+const dataWindowRange = max - min; // "d" in original code
+// Fetch a bit more data than currently visible to allow some panning without immediate refetch
+const fetchStartDate = new Date(min - dataWindowRange);
+const fetchEndDate = new Date(max + dataWindowRange);
 
-      console.log(`Fetching for symbols: ${symbolsToFetch.join(', ')} from ${startISO} to ${endISO} with timeframe ${timeframe}`);
+const startISO = fetchStartDate.toISOString();
+const endISO = fetchEndDate.toISOString();
 
-      const promises = symbolsToFetch.map(currentSymbol =>
-        fetch(
-          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=10000`
-        ).then(async resp => {
-          if (!resp.ok) {
-            const errorBody = await resp.text();
-            throw new Error(`HTTP ${resp.status} for symbol ${currentSymbol}: ${errorBody}`);
-          }
-          return resp.json().then(data => ({ symbol: currentSymbol, data }));
-        })
-      );
+console.log(`Fetching for symbols: ${symbolsToFetch.join(', ')} from ${startISO} to ${endISO} with timeframe ${timeframe}`);
 
-      const results = await Promise.all(promises);
+const symbolsParam = symbolsToFetch.join(',');
+const response = await fetch(
+  `/api/items/e/?symbol=${symbolsParam}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=10000`
+);
 
-      const newRawSeries = [];
-      let colorIndex = 0; // For assigning colors if we have many symbol-column combinations
-      let curr_framems=1;
+// Add error handling
+if (!response.ok) {
+  const errorBody = await response.text();
+  throw new Error(`HTTP ${response.status} for symbols ${symbolsParam}: ${errorBody}`);
+}
 
-      results.forEach(result => {
-        // const { symbol: currentSymbol, data: symbolSpecificData } = result;
-        const { symbol: currentSymbol, data: responseData } = result;
-        console.log(result);
-        const symbolSpecificData = responseData.data || responseData;
-        curr_framems=responseData.framems
-        console.log("length: ",symbolSpecificData.length)
+// Parse the JSON data
+const responseData = await response.json();
 
-        // Prepare arrays for min and max for the current symbol
-        const symbolColumnData = { min: [], max: [] };
+const newRawSeries = [];
+let colorIndex = 0;
+let curr_framems = 1;
 
-        symbolSpecificData.forEach(item => {
-          const t = new Date(item.time).getTime(); // Changed from item.time to item.timestamp
-          // console.log(item);
-          COLUMN_KEYS.forEach(colKey => {
-            let t1=0;
-            if(colKey=='max'){
-              t1 = item.max_time
-              // t1= new Date(item.max_time).toISOString();
-            }
-            else{
-              t1 = item.min_time
-              // t1= new Date(item.min_time).toISOString();
-            }
+// Handle the response data structure
+const allSymbolsData = responseData.data || responseData;
+curr_framems = responseData.framems || 1;
 
-            if (item[colKey] !== undefined && item[colKey] !== null) {
-                 symbolColumnData[colKey].push({x:t, y:Number(item[colKey])*scale[currentSymbol],timing:t1});
+// Group data by symbol if the API returns a flat array
+const dataBySymbol = {};
 
-            }
-          });
+// Initialize data structure for each symbol
+symbolsToFetch.forEach(symbol => {
+  dataBySymbol[symbol] = [];
+});
+
+// If API returns data grouped by symbol, use it directly
+// Otherwise, group the flat array by symbol
+if (Array.isArray(allSymbolsData)) {
+  allSymbolsData.forEach(item => {
+    const symbol = item.symbol; // Assuming each item has a symbol field
+    if (dataBySymbol[symbol]) {
+      dataBySymbol[symbol].push(item);
+    }
+  });
+} else {
+  // If API returns object with symbol keys
+  Object.keys(allSymbolsData).forEach(symbol => {
+    if (symbolsToFetch.includes(symbol)) {
+      dataBySymbol[symbol] = allSymbolsData[symbol];
+    }
+  });
+}
+
+// Process each symbol's data
+symbolsToFetch.forEach(currentSymbol => {
+  const symbolSpecificData = dataBySymbol[currentSymbol] || [];
+  console.log(`${currentSymbol} length:`, symbolSpecificData.length);
+
+  // Prepare arrays for min and max for the current symbol
+  const symbolColumnData = { min: [], max: [] };
+
+  symbolSpecificData.forEach(item => {
+    const t = new Date(item.time).getTime();
+    
+    COLUMN_KEYS.forEach(colKey => {
+      let t1 = 0;
+      if (colKey === 'max') {
+        t1 = item.max_time;
+      } else {
+        t1 = item.min_time;
+      }
+
+      if (item[colKey] !== undefined && item[colKey] !== null) {
+        symbolColumnData[colKey].push({
+          x: t, 
+          y: Number(item[colKey]) * scale[currentSymbol], 
+          timing: t1
         });
-        
-        COLUMN_KEYS.forEach((colKey, colIdx) => {
-          // Use a combination of symbol and column for color if needed, or cycle through COLORS
-          const seriesColor = COLORS[(colorIndex + colIdx) % COLORS.length];
+      }
+    });
+  });
 
-          newRawSeries.push({
-            name: `${currentSymbol} ${colKey.toUpperCase()}`, // e.g., "AAPL MIN"
-            data: symbolColumnData[colKey],
-            type: 'line',
-            color: seriesColor,
-            symbol: currentSymbol, // Store original symbol
-            column: colKey,       // Store original column key (min, max)
-            boostThreshold: 1,    // Enable boost for series
-            turboThreshold: 2000,  // For line series, default is 1000. Can be increased.
-            dataGrouping:{enabled:false},
+  COLUMN_KEYS.forEach((colKey, colIdx) => {
+    // Use a combination of symbol and column for color if needed, or cycle through COLORS
+    const seriesColor = COLORS[(colorIndex + colIdx) % COLORS.length];
 
-          });
-        });
-        colorIndex += 2; // Increment by 2 to differentiate colors between symbols
-      });
-      setFramems(time_map[curr_framems]);
-      setRawSeries(newRawSeries);
-      setLoadedRange({ min: fetchStartDate.getTime(), max: fetchEndDate.getTime() });
-      console.log(`Fetch successful for ${symbolsToFetch.join(', ')}. Time taken: ${performance.now() - startTimeMs}ms. Series count: ${newRawSeries.length}`);
+    newRawSeries.push({
+      name: `${currentSymbol} ${colKey.toUpperCase()}`, // e.g., "AAPL MIN"
+      data: symbolColumnData[colKey],
+      type: 'line',
+      color: seriesColor,
+      symbol: currentSymbol, // Store original symbol
+      column: colKey,       // Store original column key (min, max)
+      boostThreshold: 1,    // Enable boost for series
+      turboThreshold: 2000,  // For line series, default is 1000. Can be increased.
+      dataGrouping: { enabled: false },
+    });
+  });
+  colorIndex += 2; // Increment by 2 to differentiate colors between symbols
+});
+
+setFramems(time_map[curr_framems]);
+setRawSeries(newRawSeries);
+setLoadedRange({ min: fetchStartDate.getTime(), max: fetchEndDate.getTime() });
+console.log(`Fetch successful for ${symbolsToFetch.join(', ')}. Time taken: ${performance.now() - startTimeMs}ms. Series count: ${newRawSeries.length}`);
 
     } catch (err) {
       console.error('Fetch error:', err);
