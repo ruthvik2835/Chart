@@ -1,16 +1,19 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Highcharts from 'highcharts/highstock';
 import HighchartsReact from 'highcharts-react-official';
 // import Boost from 'highcharts/modules/boost';
 
-const scale={'BTC-USDT-SWAP':1 , 'XRP-USDT-SWAP':44000, 'ETH-USDT-SWAP':41};
-const SYMBOLS = ['BTC-USDT-SWAP','XRP-USDT-SWAP','ETH-USDT-SWAP']; // Added MSFT for more options
+
+const scale={'BTC-USDT-SWAP':1 , 'XRP-USDT-SWAP':44000, 'ETH-USDT-SWAP':41, 'A':1 , 'B':1 , 'C':1 , 'D':1 , 'E':1};
+
+const SYMBOLS = ['A','B','C','D','E']; // Added MSFT for more options
+
 const DEFAULT_VISIBLE_COLUMNS = {
   min: true, max: true
 };
 const DEFAULT_TIMEFRAME = '1ms';
 const DEFAULT_YSCALE = 'linear';
-const DEFAULT_SELECTED_SYMBOLS = ['BTC-USDT-SWAP']; // Default to AMZN
+const DEFAULT_SELECTED_SYMBOLS = ['A']; // Default to AMZN
 
 const oneDay = 24 * 3600 * 1000;
 function parseTimeGapToSeconds(timeStr) {
@@ -113,7 +116,7 @@ const TradingChart = () => {
 
       const promises = symbolsToFetch.map(currentSymbol =>
         fetch(
-          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=10000`
+          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1000`
         ).then(async resp => {
           if (!resp.ok) {
             const errorBody = await resp.text();
@@ -132,7 +135,7 @@ const TradingChart = () => {
       results.forEach(result => {
         // const { symbol: currentSymbol, data: symbolSpecificData } = result;
         const { symbol: currentSymbol, data: responseData } = result;
-
+        console.log(result);
         const symbolSpecificData = responseData.data || responseData;
         curr_framems=responseData.framems
         console.log("length: ",symbolSpecificData.length)
@@ -141,19 +144,22 @@ const TradingChart = () => {
         const symbolColumnData = { min: [], max: [] };
 
         symbolSpecificData.forEach(item => {
-          // const t = new Date(item.time).getTime(); // Changed from item.time to item.timestamp
-          console.log(item);
+          const t = new Date(item.time).getTime(); // Changed from item.time to item.timestamp
+          // console.log(item);
           COLUMN_KEYS.forEach(colKey => {
-            let t=0;
+            let t1=0;
             if(colKey=='max'){
-              t= new Date(item.max_time).getTime();
+              t1 = item.max_time
+              // t1= new Date(item.max_time).toISOString();
             }
             else{
-              t= new Date(item.min_time).getTime();
+              t1 = item.min_time
+              // t1= new Date(item.min_time).toISOString();
             }
 
             if (item[colKey] !== undefined && item[colKey] !== null) {
-                 symbolColumnData[colKey].push([t, Number(item[colKey])*scale[currentSymbol]]);
+                 symbolColumnData[colKey].push({x:t, y:Number(item[colKey])*scale[currentSymbol],timing:t1});
+
             }
           });
         });
@@ -201,7 +207,7 @@ const TradingChart = () => {
   };
 }
 
-const debouncedFetchData = useMemo(() => debounceAsync(fetchData, 10), [fetchData]);
+const debouncedFetchData = useMemo(() => debounceAsync(fetchData, 70), [fetchData]);
 
 // Effect for initial data load
 useEffect(() => {
@@ -457,8 +463,21 @@ useEffect(() => {
     },
     tooltip: {
       shared: true,
-      xDateFormat: '%Y-%m-%d %H:%M:%S.%L',
-      valueDecimals: 6,
+      useHTML: true,
+      formatter: function () {
+        // Start with the X‐value in bold
+        let tooltip = `<b></b><br>`;
+
+        // For each point at this X, append a colored bullet, series name, value and timing
+        this.points.forEach(point => {
+          tooltip +=
+            `<span style="color:${point.color}">\u25CF</span> ` +
+            `${point.series.name}: ${point.y}` +
+            `<br><i> ${point.point.timing || 'N/A'}</i><br><br>`;
+        });
+
+        return tooltip;
+      }
     },
     legend: {
         enabled: true,
@@ -524,7 +543,7 @@ useEffect(() => {
   
   if (isLoading) {
     if (chartRef.current && chartRef.current.chart) {
-        chartRef.current.chart.showLoading('Updating data...');
+        // chartRef.current.chart.showLoading('Updating data...');
     }
   } else {
     if (chartRef.current && chartRef.current.chart) {

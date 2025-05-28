@@ -77,3 +77,4 @@ dist/
 # Other
 logs/
 tmp/
+*.bat

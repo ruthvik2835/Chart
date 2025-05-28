@@ -6,6 +6,9 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    # import os
+    os.environ['PYKX_BETA_FEATURES'] = '1'
+    os.environ['PYKX_THREADING'] = '1'
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'lsg.settings')
     try:
         from django.core.management import execute_from_command_line
