@@ -116,7 +116,7 @@ const TradingChart = () => {
 
       const promises = symbolsToFetch.map(currentSymbol =>
         fetch(
-          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=1000`
+          `/api/items/e/?symbol=${currentSymbol}&time_gap=${parseTimeGapToSeconds(timeframe)}&start_date=${startISO}&end_date=${endISO}&N=10000`
         ).then(async resp => {
           if (!resp.ok) {
             const errorBody = await resp.text();

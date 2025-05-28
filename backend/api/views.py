@@ -15,33 +15,35 @@ FRAME_TABLE_MAP = {
     60000:'Item_1min',
 }
 KDB_EPOCH = datetime(2000, 1, 1)
-def table_to_dict(result):
-    def convert_value(v):
-        # If pykx object with .py() method, extract Python type
-        try:
-            py = v.py()
-        except Exception:
-            py = v
-        # If datetime, return ISO format
-        if isinstance(py, datetime):
-            return py.isoformat()
-        # Else return raw value
-        return py
-
-    if hasattr(result, '_cols'):
-        out = {}
-        for col, arr in result._cols.items():
-            # arr is iterable of kdb+ values
-            out[col] = [convert_value(val) for val in arr]
-        return out
-    # handle scalar or list
-    try:
-        return {'values': [convert_value(v) for v in result]}
-    except Exception:
-        val = result.py() if hasattr(result, 'py') else result
-        return {'value': convert_value(val)}
-# Helper: convert ISO 'YYYY.MM.DDThh:mm:ss.sss' to q timestamp literal
-
+def serialize(q_result):
+    col_dict = q_result.py(raw=True)
+    col_dict = {
+        k.decode() if isinstance(k, bytes) else k:
+        v for k, v in col_dict.items()
+    }
+    rows = []
+    for i in range(len(next(iter(col_dict.values())))):
+        row = {}
+        for col, values in col_dict.items():
+            val = values[i]
+            col1=col
+            if col in ("min_date","max_date","time"):
+                val = (KDB_EPOCH + timedelta(days=val)).isoformat()+'Z'
+            if col=="max_price":
+                col1="max"
+            elif col=="min_price":
+                col1="min"
+            elif col=="min_date":
+                col1="min_time"
+            elif col=="max_date":
+                col1="max_time"
+            else:
+                col1=col
+            if isinstance(val, bytes):
+                val = val.decode()
+            row[col1] = val
+        rows.append(row)
+    return rows
 def to_q_timestamp(iso_str: str) -> str:
     """
     Convert an ISO8601 UTC string with 'Z' suffix into
@@ -113,14 +115,7 @@ def get_items_equidistant(request):
     try:
         with kx.QConnection(host='localhost', port=5000) as q:
             res = q(qcmd)
-            df = res.pd(raw=True)
-            # print(df)
-            records=df.to_dict(orient='records')
-            for rec in records:
-                for col in ('time', 'min_time', 'max_time'):
-                    if col in rec and isinstance(rec[col], (int, float)):
-                        iso = (KDB_EPOCH + timedelta(days=rec[col])).isoformat()
-                        rec[col] = iso
+            records=serialize(res)
 
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
